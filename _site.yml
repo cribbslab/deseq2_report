@@ -1,6 +1,6 @@
-name: project:
+name: project
 navbar:
-  title: project:
+  title: project
   right:
   - text: Home
     href: index.html
