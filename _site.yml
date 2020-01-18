@@ -29,5 +29,5 @@ exclude:
 - counts
 - expdata
 - '*.R'
-output_dir: _site
+output_dir: Final_report
 

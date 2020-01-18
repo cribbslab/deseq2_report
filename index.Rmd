@@ -4,3 +4,32 @@ output: html_document
 ---
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
+# Running the report
+
+This Rmarkdown report describes the output of bulk RNA-seq experiments. 
+
+Ths report requires a counts table (samples x genes) generated from running pseudoalignment (kallisto or salmon) or running mapping (hisat) followed by featurecounts.
+
+## Before running the report
+
+To generate the report clone the repository from github then:
+
+* Rename the Rproj file
+* add a meta data file following the naming convention design_<test>_<control>_<test>_<column>.csv
+* a counts table called featurecounts.tsv.gz
+
+### Setting up the design file
+
+For each analysis a design file is written and needs to conform to the following naming convention for the file:
+
+design_<test>_<control>_<test>_<column>.csv - please look at th example file in the repo for how to set up your analysis.
+
+One column requires the title model and the first row contains the model that is to be used for the analysis. For lrt and additional column called reduced is needed and specifies the reduced model that is passed to DESeq2.
+
+## Generate the report
+
+Double click the Rproj file and Rstudio will open. Make sure rmarkdown is installed in your library and hit the build tab on the environment window and then click "Build Website". When the website has finished building a window will pop up with the rendered site. The final report is in the directory "Final_report" and can be accessed by opening the index.html file in a web browser. 
+
+## Useful links
+
+* This is a very useful link to explain how to correctly set an LRT test in DESeq2 https://hbctraining.github.io/DGE_workshop/lessons/08_DGE_LRT.html
