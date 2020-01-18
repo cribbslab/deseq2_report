@@ -96,14 +96,25 @@ run_deseq2_full <- function(df_mRNA, meta_data){
 }
 
 
-run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", value){
 
+
+
+setClass(Class="DESeq2_return",
+         representation(
+           res="DESeqResults",
+           dds="DESeqDataSet"
+         )
+)
+
+
+run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", value, model){
+  
   df_mRNA = df_mRNA[,rownames(meta_data)]
   
   
   dds<- DESeqDataSetFromMatrix(countData=df_mRNA,
                                colData=meta_data,
-                               design= ~Treatment)
+                               design=as.formula(model))
   
   keep <- rowSums(counts(dds)) >= 10
   dds <- dds[keep,]
@@ -112,7 +123,9 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
   
   res <- results(dds, contrast = c(value, test,control))
   
-  return(res)
+  return(new("DESeq2_return",
+             res=res,
+             dds=dds))
 }
 
 run_deseq2_paired <- function(df_mRNA, meta_data, control="untreated", test="treated"){
@@ -139,6 +152,42 @@ run_deseq2_paired <- function(df_mRNA, meta_data, control="untreated", test="tre
   
   return(res)
 }
+
+
+
+plot_volcano <- function(res){
+  
+  test <- as.data.frame(res)
+  
+  data <- as.vector(rownames(test))
+  annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
+                                   columns="SYMBOL", keytype = "ENSEMBL")
+  
+  result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
+  res <- result %>% 
+    dplyr::select(log2FoldChange, SYMBOL, baseMean, padj, Row.names) %>% 
+    na.omit()
+  
+  
+  mutateddf <- mutate(res, sig=ifelse(res$padj<0.01, "padj<0.01", "Not Sig")) #Will have different colors depending on significance
+  input <- cbind(gene=rownames(mutateddf), mutateddf )
+  input <- input %>% 
+    arrange(input$padj)
+  
+  symbol_data <- head(input, 30)
+  
+  #convert the rownames to a column
+  volc = ggplot(input, aes(log2FoldChange, -log10(padj))) + #volcanoplot with log2Foldchange versus pvalue
+    geom_point(aes(col=sig)) + #add points colored by significance
+    geom_point(data=symbol_data, aes(log2FoldChange, -log10(padj)), colour="red") +
+    ggtitle("Volcano") #e.g. 'Volcanoplot DESeq2'
+  
+  #setEPS()
+  #postscript("MUG_volcano.eps")
+  volcano <- volc+geom_text_repel(data=symbol_data, aes(label=`SYMBOL`)) + scale_colour_Publication() + theme_bw()#adding text for the genes
+  return(volcano)
+}
+
 
 
 
