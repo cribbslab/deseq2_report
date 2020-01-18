@@ -24,6 +24,13 @@ ensembl_to_symbol <- function(dataframe, ensembl_column){
   }
 
 
+setClass(Class="filter_genes_return",
+         representation(
+           res="data.frame",
+           sig="data.frame"
+         )
+)
+
 filter_genes <- function(result, name){
   
   test <- as.data.frame(result)
@@ -49,7 +56,9 @@ filter_genes <- function(result, name){
   write_csv(res, res_name)
   write_tsv(sig, sig_name_tsv)
   write_tsv(res, res_name_tsv)
-  return(list("sig"= sig, "res"= res))
+  return(new("filter_genes_return",
+             res=res,
+             sig=sig))
 }
 
 
@@ -80,12 +89,12 @@ filter_genes_single <- function(result, name){
   return(list("sig"= sig, "res"= res))
 }
 
-run_deseq2_full <- function(df_mRNA, meta_data){
+run_deseq2_full <- function(df_mRNA, meta_data, model){
   
   
   dds<- DESeqDataSetFromMatrix(countData=df_mRNA,
                                colData=meta_data,
-                               design= ~Treatment) 
+                               design=as.formula(model)) 
   
   keep <- rowSums(counts(dds)) >= 10
   dds <- dds[keep,]
@@ -128,29 +137,34 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
              dds=dds))
 }
 
-run_deseq2_paired <- function(df_mRNA, meta_data, control="untreated", test="treated"){
-  
-  rownames(meta_data) <- meta_data[,1]
+setClass(Class="DESeq2_return",
+         representation(
+           res="DESeqResults",
+           dds="DESeqDataSet"
+         )
+)
+
+
+run_deseq2_lrt <- function(df_mRNA, meta_data, control="untreated", test="treated", value, model,
+                           reduced){
   
   df_mRNA = df_mRNA[,rownames(meta_data)]
-  
-  rownames(meta_data) <- colnames(df_mRNA)
   
   
   dds<- DESeqDataSetFromMatrix(countData=df_mRNA,
                                colData=meta_data,
-                               design= ~pair + group)
+                               design=as.formula(model))
   
   keep <- rowSums(counts(dds)) >= 10
   dds <- dds[keep,]
   
-  dds$group <- factor(dds$group, levels = c(test, control))
+  dds <- DESeq(dds, test="LRT", reduced =as.formula(reduced))
   
-  dds <- DESeq(dds)
+  res <- results(dds, contrast = c(value, test,control))
   
-  res <- results(dds, contrast = c("treatment", test, control))
-  
-  return(res)
+  return(new("DESeq2_lrt_return",
+             res=res,
+             dds=dds))
 }
 
 

@@ -18,12 +18,15 @@ library(pheatmap)
 library(tidyverse)
 library(DT)
 library(limma)
+library(knitr)
+library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
+knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
 ```
 
 
-```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+```{r}
 
 design_files <- list.files(pattern = "design_")
 
@@ -49,7 +52,7 @@ if (file.exists(design_files[1])) {
 
 ```
 
-```{r , message=FALSE, include=FALSE}
+```{r}
 ## Set up the DESeq2 object
 
 for (i in design_files) {
@@ -62,7 +65,13 @@ for (i in design_files) {
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   model <- as.character(meta_data$model[[1]])
   
-  deseq_results <- run_deseq2(as.data.frame(df_mRNA), meta_data, control = control, test=test, value=value, model = model)
+  if ("wald" == stat.test){
+    deseq_results <- run_deseq2(as.data.frame(df_mRNA), meta_data, control = control, test=test, value=value, model = model)
+
+  } else {
+    reduced_model <- as.character(meta_data$reduced[[1]])
+      deseq_results <- run_deseq2_lrt(as.data.frame(df_mRNA), meta_data, control = control, test=test, value=value, model = model)
+    }
   
   res = deseq_results@res
   dds = deseq_results@dds
@@ -83,25 +92,25 @@ Plotting the dispersion estimates is a useful diagnostic. The dispersion plot be
 
 ```{r, results='asis', echo = FALSE}
 for (i in design_files){
+  name <-  gsub(".csv","",i)
   dds <- get(gsub("SAMPLE_FILE",i , "dds.SAMPLE_FILE"))
-  cat("### ",i,"\n")
-  plt <- plotDispEsts(dds)
-  print(plt)
+  cat("### ",name,"\n")
+ plotDispEsts(dds)
+
   cat('\n\n')
 } 
 
 ```
 
 
-## Summary of the data {.tabset .tabset-fade}
+# Summary of the data 
 
 
-```{r, results='asis', echo = FALSE}
+```{r, results='asis'}
 for (i in design_files){
+  name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  cat("### ",i,"\n")
   summary(res, alpha=0.05)
-  cat('\n\n')
 } 
 
 ```
@@ -114,8 +123,9 @@ In DESeq2, the function plotMA shows the log2 fold changes attributable to a giv
 
 ```{r, results='asis', echo = FALSE}
 for (i in design_files){
+  name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  cat("### ",i,"\n")
+  cat("### ",name,"\n")
   plt <- DESeq2::plotMA(res)
   print(plt)
   cat('\n\n')
@@ -123,15 +133,16 @@ for (i in design_files){
 
 ```
 
-# Volcano plots {.tabset .tabset-fade}
+## Volcano plots {.tabset .tabset-fade}
 
 
 
 ```{r, results='asis', echo = FALSE}
 
 for (i in design_files){
+  name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  cat("### ",i,"\n")
+  cat("### ",name,"\n")
   plt <- plot_volcano(res)
   print(plt)
   cat('\n\n')
@@ -140,36 +151,57 @@ for (i in design_files){
 
 ```
 
-## Results tables
+## Histogram of pvalues {.tabset .tabset-fade}
+
+```{r, results='asis'}
+use <- res$baseMean > metadata(res)$filterThreshold
+h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
+h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
+colori <- c(`do not pass`="khaki", `pass`="powderblue")
+
+barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
+        col = colori, space = 0, main = "", ylab="frequency")
+text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
+     adj = c(0.5,1.7), xpd=NA)
+legend("topright", fill=rev(colori), legend=rev(names(colori)))
+```
+
+## Results tables {.tabset .tabset-fade}
 
 The folowing results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
 
 
-### 24hr J4 vs DMSO
 
-```{r , message=FALSE, echo=FALSE}
-dt <- filter_genes(as.data.frame(res_24), name="featurecounts_24hrJ4vsdmso")
 
-datatable(dt$sig)
+```{r data.setup}
+new_list <- list()
+names <- c()
+for (i in design_files){
+  name.start <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
+  name <- paste0("featurecounts_", name.start)
+  dt <- filter_genes(as.data.frame(res), name=name)
+  table <- dt@sig
+  new_list[[paste0("dt_",name,sep="")]] <- table
+  names <- c(names, name)
+} 
+df <- data.frame(cbind(new_list, classification=names))
+
 ```
 
-### 6hr J4 vs DMSO
-
-```{r , message=FALSE, echo=FALSE}
-dt <- filter_genes(as.data.frame(res_6), name="featurecounts_6hrJ4vsdmso")
-
-datatable(dt$sig)
+```{r include = FALSE}
+# Why, oh why do I need this chunk?
+datatable(df)
 ```
 
-### 3hr J4 vs DMSO
+```{r results = 'asis'}
 
-```{r , message=FALSE, echo=FALSE}
-dt <- filter_genes(as.data.frame(res_3), name="featurecounts_3hrJ4vsdmso")
-
-datatable(dt$sig)
+for(j in unique(df$classification)){ # You were using level() here, so your for-loop never got off the ground
+        df.j <- df[df$classification == j, ]
+        cat(paste("\n\n###", j, "\n"))
+        df_final <- as.data.frame(df.j$new_list)
+        colnames(df_final) <- c("Log2FoldChage", "Symbol", "GeneName", "baseMean", "padj", "Ensembl")
+        print( htmltools::tagList(datatable(df_final) ))
+}
 ```
 
-
-# Conclusion
-
-Given the high level of low count genes in the dataset: The biological and technical variation in the experiment dominates any true log fold changes across condition given your sample size. Another way to say this is that the experiment was underpowered to detect the changes across condition.
