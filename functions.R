@@ -1,14 +1,4 @@
-Reactome_analysis <- function(background, data, ontology, name=""){
-  
-  name = paste(name)
-  eTerm <- xEnricherGenes(data=data, background=background, ontology=ontology)
-  eTerm_u373.tmz_MsigdbC2REACTOME <- xEnrichConciser(eTerm)
-  xEnrichViewer(eTerm_u373.tmz_MsigdbC2REACTOME, 10)
-  bp_IFN24_MsigdbC2REACTOME <- xEnrichBarplot(eTerm_u373.tmz_MsigdbC2REACTOME, top_num=10, displayBy="fdr")
-  
-  bp_IFN24_MsigdbC2REACTOME <- bp_IFN24_MsigdbC2REACTOME + ggtitle(paste0(name))
-  return(bp_IFN24_MsigdbC2REACTOME)
-}
+
 
 ensembl_to_symbol <- function(dataframe, ensembl_column){
   
@@ -47,7 +37,7 @@ filter_genes <- function(result, name){
   sig <- res %>% 
     filter(log2FoldChange > 1 | log2FoldChange < -1) %>% 
     filter(padj < 0.05)
-  
+  dir.create(file.path("results"), showWarnings = FALSE)
   sig_name = paste("results/", name,"_sig.csv", sep="")
   sig_name_tsv = paste("results/", name,"_sig.tsv", sep="")
   res_name = paste("results/",name,"_res.csv", sep="")

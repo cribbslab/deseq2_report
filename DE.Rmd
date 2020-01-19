@@ -1,0 +1,207 @@
+---
+title: "Differential expression"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+This Rmarkdown document presents results from a bulk RNA-seq experiment that has been processed using mapping (e.g. hisat2) and then features are counted using featurecounts. For data that has been processed using pseudoalignment please refer to DE_pseudoalignment.
+
+To run the Rmarkdown please save your data as 
+
+
+```{r, include=FALSE}
+source('functions.R')
+library(org.Hs.eg.db)
+library(DESeq2)
+library(pheatmap)
+library(tidyverse)
+library(DT)
+library(limma)
+library(knitr)
+library(kableExtra)
+library("ggplot2") #Best plots
+library("ggrepel") #Avoid overlapping labels
+knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+```{r}
+
+design_files <- list.files(pattern = "design_")
+
+if (file.exists("featurecounts.tsv.gz")) {
+  df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
+  colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
+} else {
+  print("Please add featurecounts.tsv.gz into the project folder as it seems to be missing")
+}
+
+
+if (file.exists(design_files[1])) {
+  for (i in design_files){
+  meta_data <- read.table(i, sep=",", header = TRUE) 
+  rownames(meta_data) <- meta_data$Sample
+  df_mRNA = df_mRNA[,rownames(meta_data)]
+  all(rownames(meta_data) %in% colnames(df_mRNA))
+  assign(paste("meta_data", i, sep = "."), meta_data)
+  }
+} else {
+    print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
+  }
+
+```
+
+```{r}
+## Set up the DESeq2 object
+
+for (i in design_files) {
+  x <- strsplit(i, "_")
+  stat.test <- x[[1]][2]
+  control <- x[[1]][3]
+  test <- x[[1]][4]
+  value <- x[[1]][5]
+  value <- gsub(".csv","",value)
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+  model <- as.character(meta_data$model[[1]])
+  
+  if ("wald" == stat.test){
+    deseq_results <- run_deseq2(as.data.frame(df_mRNA), meta_data, control = control, test=test, value=value, model = model)
+
+  } else {
+    reduced_model <- as.character(meta_data$reduced[[1]])
+      deseq_results <- run_deseq2_lrt(as.data.frame(df_mRNA), meta_data, control = control, test=test, value=value, model = model, reduced = reduced_model)
+    }
+  
+  res = deseq_results@res
+  dds = deseq_results@dds
+  assign(paste("res", i, sep = "."), res)
+  assign(paste("dds", i, sep = "."), dds)
+}
+
+```
+
+# Model fitting
+
+This section of the report describes figures that can be used to assess how well the DESeq2 model has fitted the data.
+
+## Dispersion {.tabset .tabset-fade}
+
+Plotting the dispersion estimates is a useful diagnostic. The dispersion plot below is typical, with the final estimates shrunk from the gene-wise estimates towards the fitted estimates. Some gene-wise estimates are flagged as outliers and not shrunk towards the fitted value, (this outlier detection is described in the manual page for estimateDispersionsMAP). The amount of shrinkage can be more or less than seen here, depending on the sample size, the number of coefficients, the row mean and the variability of the gene-wise estimates.
+
+
+```{r, results='asis', echo = FALSE}
+for (i in design_files){
+  name <-  gsub(".csv","",i)
+  dds <- get(gsub("SAMPLE_FILE",i , "dds.SAMPLE_FILE"))
+  cat("### ",name,"\n")
+ plotDispEsts(dds)
+
+  cat('\n\n')
+} 
+
+```
+
+
+# Summary of the data 
+
+
+```{r, results='asis'}
+for (i in design_files){
+  name <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
+  summary(res, alpha=0.05)
+} 
+
+```
+
+
+## MA plots {.tabset .tabset-fade}
+
+In DESeq2, the function plotMA shows the log2 fold changes attributable to a given variable over the mean of normalized counts for all the samples in the DESeqDataSet. Points will be colored red if the adjusted p value is less than 0.01. Points which fall out of the window are plotted as open triangles pointing either up or down.
+
+
+```{r, results='asis', echo = FALSE}
+for (i in design_files){
+  name <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
+  cat("### ",name,"\n")
+  plt <- DESeq2::plotMA(res)
+  print(plt)
+  cat('\n\n')
+} 
+
+```
+
+## Volcano plots {.tabset .tabset-fade}
+
+
+
+```{r, results='asis', echo = FALSE}
+
+for (i in design_files){
+  name <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
+  cat("### ",name,"\n")
+  plt <- plot_volcano(res)
+  print(plt)
+  cat('\n\n')
+} 
+
+
+```
+
+## Histogram of pvalues {.tabset .tabset-fade}
+
+```{r, results='asis'}
+use <- res$baseMean > metadata(res)$filterThreshold
+h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
+h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
+colori <- c(`do not pass`="khaki", `pass`="powderblue")
+
+barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
+        col = colori, space = 0, main = "", ylab="frequency")
+text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
+     adj = c(0.5,1.7), xpd=NA)
+legend("topright", fill=rev(colori), legend=rev(names(colori)))
+```
+
+## Results tables {.tabset .tabset-fade}
+
+The folowing results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
+
+
+
+
+```{r data.setup}
+new_list <- list()
+names <- c()
+for (i in design_files){
+  name.start <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
+  name <- paste0(name.start)
+  dt <- filter_genes(as.data.frame(res), name=name)
+  table <- dt@sig
+  new_list[[paste0("dt_",name,sep="")]] <- table
+  names <- c(names, name)
+} 
+df <- data.frame(cbind(new_list, classification=names))
+
+```
+
+```{r include = FALSE}
+# Why, oh why do I need this chunk?
+datatable(df)
+```
+
+```{r results = 'asis'}
+
+for(j in unique(df$classification)){ # You were using level() here, so your for-loop never got off the ground
+        df.j <- df[df$classification == j, ]
+        cat(paste("\n\n###", j, "\n"))
+        df_final <- as.data.frame(df.j$new_list)
+        colnames(df_final) <- c("Log2FoldChage", "Symbol", "GeneName", "baseMean", "padj", "Ensembl")
+        print( htmltools::tagList(datatable(df_final) ))
+}
+```
+
