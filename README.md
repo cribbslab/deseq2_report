@@ -22,10 +22,10 @@ Example files are currently within the repo so if you are unsure on how each of 
 * Remove the design_* files and make your own based on the following naming convention:
 
   `design_<test>_<control>_<test>_<column>.csv`
-  <test> - refers to the test that you plan to run. There are two options "ltr" or "wald".
-  <control> - This is the name of your control condition i.e. the samples you want to test against. This should match on of the samples in the <column> of the file.
-  <test> - This is the name of the test condition. This should match with one of the samples in the <column> of the file
-  <column> - This is a column that you want to use for your Deseq model in the design_* file
+1. <test> - refers to the test that you plan to run. There are two options "ltr" or "wald".
+2. <control> - This is the name of your control condition i.e. the samples you want to test against. This should match on of the samples in the <column> of the file.
+3. <test> - This is the name of the test condition. This should match with one of the samples in the <column> of the file
+4. <column> - This is a column that you want to use for your Deseq model in the design_* file
 
 You can have multiple design_* files in the folder.
 
