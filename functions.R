@@ -127,7 +127,7 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
              dds=dds))
 }
 
-setClass(Class="DESeq2_return",
+setClass(Class="DESeq2_lrt_return",
          representation(
            res="DESeqResults",
            dds="DESeqDataSet"
