@@ -1,16 +1,21 @@
-name: project
+name: Bulk RNA_seq analysis
 navbar:
-  title: project
+  title: Bulk RNA_seq analysis
   right:
   - text: Home
     href: index.html
   - text: Clustering
     icon: fa-flask
-    href: Clustering_removed.html
+    href: Clustering.html
   - text: Differential expression
     icon: fa-flask
-    href: DE_NORM_removed.html
-
+    href: DE.html
+  - text: Enrichment EnrichR
+    icon: fa-flask
+    href: Enrichr_Enrichment.html
+  - text: Enrichment XGR
+    icon: fa-flask
+    href: XGR_Enrichment.html
 output:
   html_document:
     css: style.css
