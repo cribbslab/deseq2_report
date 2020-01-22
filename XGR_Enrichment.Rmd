@@ -1,18 +1,21 @@
 ---
 title: "Enrichment"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r, include=FALSE}
 library(XGR)
 library(DT)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE, error=FALSE)
 ```
 
 
 # Reactome
 
 
-```{r,warning=FALSE,message=FALSE,error=FALSE}
+```{r}
 
 files <- Sys.glob("results/*sig.csv")
 
@@ -31,6 +34,7 @@ for (i in files) {
   eTerm <- xEnricherGenes(data=data, background=background, ontology=ontology)
   eTerm <- xEnrichConciser(eTerm)
   
+  dir.create(file.path("enrichment_XGR"), showWarnings = FALSE)
   dir.create(file.path("enrichment_XGR", ontology), showWarnings = FALSE)
   output <- paste0("enrichment_XGR","/", ontology, "/", name, ".csv")
   write.csv(file=as.character(output), as.data.frame(xEnrichViewer(eTerm)))

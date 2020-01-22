@@ -22,7 +22,7 @@ library(knitr)
 library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
-knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
 ```
 
 
@@ -95,7 +95,8 @@ for (i in design_files){
   name <-  gsub(".csv","",i)
   dds <- get(gsub("SAMPLE_FILE",i , "dds.SAMPLE_FILE"))
   cat("### ",name,"\n")
- plotDispEsts(dds)
+  p <- plotDispEsts(dds)
+  print(p)
 
   cat('\n\n')
 } 
@@ -107,10 +108,14 @@ for (i in design_files){
 
 
 ```{r, results='asis'}
+k <- list()
 for (i in design_files){
   name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  summary(res, alpha=0.05)
+    cat("### ",name,"\n")
+   print(summary(res, alpha=0.05))
+  cat('\n\n')
+
 } 
 
 ```

@@ -1,11 +1,13 @@
 ---
 title: "Enrichment"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ```{r, include=FALSE}
 library(enrichR)
-knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
 ```
 
 ```{r}
@@ -21,13 +23,14 @@ for (i in files) {
   sig <- read.csv(file=as.character(i))
   total_enriched <- as.vector(sig$SYMBOL) 
   enriched <- enrichr(total_enriched, dbs)
-  printEnrich(enriched, "output.txt" , sep = "\t", columns = c(1:9))
+  #printEnrich(enriched, "output.txt" , sep = "\t", columns = c(1:9))
   
   for (x in dbs){
     bp <- enriched[[as.character(x)]]
     
+    dir.create(file.path("enrichment"), showWarnings = FALSE)
     dir.create(file.path("enrichment", x), showWarnings = FALSE)
-    output <- paste0("enrichment/",x,"/", x, "_", name, ".csv")
+    output <- paste0("enrichment/",x,"/", "_", name, ".csv")
     write.csv(file=as.character(output), as.data.frame(bp))
   }
 }
