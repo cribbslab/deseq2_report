@@ -55,6 +55,7 @@ if (file.exists(design_files[1])) {
 ```{r , include=FALSE}
 
 for (i in design_files) {
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   model <- as.character(meta_data$model[[1]])
   dds <- run_deseq2_full(df_mRNA, meta_data, model)
   assign(paste("dds_full", i, sep = "."), dds)
