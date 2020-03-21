@@ -1,1 +1,11 @@
+# basic options
+title: Deseq2 report generator
+author: Adam Cribbs
+email: adam.cribbs@ndorms.ox.ac.uk
+description: This is a repo containing the code that allows you to automatically generate a DESeq2 report
+twitter_username: CribbsP
+github_username:  Acribbs
+
+# Build settings
+markdown: kramdown
 theme: jekyll-theme-cayman
