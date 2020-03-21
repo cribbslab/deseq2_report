@@ -8,4 +8,17 @@ github_username:  Acribbs
 
 # Build settings
 markdown: kramdown
-theme: jekyll-theme-cayman
+theme: jekyll-theme-minimal
+
+# defaults (to simplify front matter)
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# urls
+# your gh-pages url: https://username.github.io
+url: https://acribbs.github.io
+# your repository name: /repository
+baseurl: /deseq2_report

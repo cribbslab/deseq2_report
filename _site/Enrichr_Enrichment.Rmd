@@ -1,0 +1,34 @@
+```{r, include=FALSE}
+library(enrichR)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+dbs <- listEnrichrDbs()
+dbs <- c("GO_Molecular_Function_2015", "GO_Cellular_Component_2015", "GO_Biological_Process_2015" , "ChEA_2016" ,"KEGG_2016")
+
+files <- Sys.glob("results/*sig.csv")
+
+for (i in files) {
+
+  name <-  gsub(".csv","",i)
+  name <-  gsub("results/","",name)
+  sig <- read.csv(file=as.character(i))
+  total_enriched <- as.vector(sig$SYMBOL) 
+  enriched <- enrichr(total_enriched, dbs)
+  #printEnrich(enriched, "output.txt" , sep = "\t", columns = c(1:9))
+  
+  for (x in dbs){
+    bp <- enriched[[as.character(x)]]
+    
+    dir.create(file.path("enrichment"), showWarnings = FALSE)
+    dir.create(file.path("enrichment", x), showWarnings = FALSE)
+    output <- paste0("enrichment/",x,"/", "_", name, ".csv")
+    write.csv(file=as.character(output), as.data.frame(bp))
+  }
+}
+```
+
+# Enrichment
+
+The EnrichR enrichment output files can be found within the directory "enrichment/"

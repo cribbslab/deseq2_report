@@ -1,0 +1,45 @@
+<p>The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data.</p>
+
+<p>Ths report requires a counts table (samples x genes) generated from running pseudoalignment (kallisto or salmon) or running mapping (hisat) followed by featurecounts.</p>
+
+<p>In order to run the report you require the following input files for the report to generate a report correctly:</p>
+
+<ol>
+  <li>A meta data file following the naming convention design_<test>_<control>_<test>_<column>.csv</column></test></control></test></li>
+  <li>A counts table called featurecounts.tsv.gz</li>
+</ol>
+
+<p>Example files are currently within the repo so if you are unsure on how each of these files should be layed out please refer to the repo.</p>
+
+<h2 id="running-the-rmarkdown">Running the Rmarkdown</h2>
+
+<ul>
+  <li>Clone the repository:</li>
+</ul>
+
+<p><code class="highlighter-rouge">git clone https://github.com/Acribbs/deseq2_report.git</code></p>
+
+<ul>
+  <li>
+    <p>Navigate to the directory and rename the deseq2.Rproj file to something of your choosing</p>
+  </li>
+  <li>
+    <p>Remove the design_* files and make your own based on the following naming convention:</p>
+
+    <p><code class="highlighter-rouge">design_&lt;test&gt;_&lt;control&gt;_&lt;test&gt;_&lt;column&gt;.csv</code>
+      1. <code class="highlighter-rouge">&lt;test&gt;</code> - refers to the test that you plan to run. There are two options “ltr” or “wald”.
+      2. <code class="highlighter-rouge">&lt;control&gt;</code> - This is the name of your control condition i.e. the samples you want to test against. This should match on of the samples in the <column> of the file.
+      3. `<test>` - This is the name of the test condition. This should match with one of the samples in the <column> of the file
+      4. `<column>` - This is a column that you want to use for your Deseq model in the design_* file</column></column></test></column></p>
+  </li>
+</ul>
+
+<p>You can have multiple design_* files in the folder.</p>
+
+<ul>
+  <li>Double click the Rproj folder and the project should open in Rstudio then click “Build Website”</li>
+</ul>
+
+<p><img src="https://raw.githubusercontent.com/Acribbs/deseq2_report/master/img/build_img.png" alt="Location of Build Website in Rstudio" /></p>
+
+<p>Make sure rmarkdown is installed in your library and hit the build tab on the environment window and then click “Build Website”. When the website has finished building a window will pop up with the rendered site. The final report is in the directory “Final_report” and can be accessed by opening the index.html file in a web browser.</p>

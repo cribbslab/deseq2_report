@@ -1,9 +1,6 @@
----
-title: Home
-layout: default
----
+# Deseq2 Bulk RNA-seq Report
 
-The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data.
+The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data. 
 
 Ths report requires a counts table (samples x genes) generated from running pseudoalignment (kallisto or salmon) or running mapping (hisat) followed by featurecounts.
 
