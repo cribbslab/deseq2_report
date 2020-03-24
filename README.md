@@ -2,6 +2,8 @@
 
 The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data. 
 
+Documentation for this code can be accessed [here](https://acribbs.github.io/deseq2_report/)
+
 Ths report requires a counts table (samples x genes) generated from running pseudoalignment (kallisto or salmon) or running mapping (hisat) followed by featurecounts.
 
 In order to run the report you require the following input files for the report to generate a report correctly:
