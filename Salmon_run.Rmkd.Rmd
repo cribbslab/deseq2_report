@@ -1,0 +1,70 @@
+---
+title: "Salmon Tutorial"
+output: html_document
+---
+
+This tutorial is taken and adapted from the salmon tutorial (https://combine-lab.github.io/alevin-tutorial/2019/selective-alignment/).
+
+```{r}
+library(reticulate)
+reticulate::use_condaenv("kallisto", required = TRUE)
+```
+
+
+# Download the reference
+
+To build a salon index you will need to download the reference transcriptome and genome. As an example we are downloading the gencode mouse reference, please change the ftp link to point to your files of interest.
+
+```{bash,  engine.opts='-l'}
+cd data/ && wget  ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M23/gencode.vM23.transcripts.fa.gz && wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M23/GRCm38.primary_assembly.genome.fa.gz
+```
+
+
+# Installing salmon
+
+If you havent already done so please install salmon using conda
+
+```{bash}
+# conda install --channel bioconda salmon
+```
+
+# Prepare metadata
+
+Salmon indexing requires the names of the genome targets, which is extractable by using the grep command:
+
+```{bash, engine.opts='-l'}
+grep "^>" <(gunzip -c data/GRCm38.primary_assembly.genome.fa.gz) | cut -d " " -f 1 > data/decoys.txt
+sed -i.bak -e 's/>//g' data/decoys.txt
+```
+
+Along with the list of decoys salmon also needs the concatenated transcriptome and genome reference file for index. NOTE: the genome targets (decoys) should come after the transcriptome targets in the reference
+
+```{bash}
+cat data/gencode.vM23.transcripts.fa.gz data/GRCm38.primary_assembly.genome.fa.gz > data/gentrome.fa.gz
+```
+
+# Salmon indexing
+
+We have all the ingredients ready for the salmon recipe. We can run salmon indexing step as follows:
+
+```{bash, engine.opts='-l'}
+conda activate kallisto
+mkdir salmon_index &&
+cd salmon_index &&
+salmon index -t ../data/gentrome.fa.gz -d ../data/decoys.txt -p 2 -i salmon_index --gencode
+```
+
+NOTE: --gencode flag is for removing extra metdata in the target header separated by | from the gencode reference. You can skip it if using other references.
+
+# Running salmon quant
+
+
+```{bash, engine.opts='-l'}
+conda activate kallisto
+for prefix in $(ls *.fastq | sed -r 's/_R[12]_001[.]fastq//' | uniq)
+do
+salmon quant -o ${prefix%.fastq}tpout  \
+   -l ISR -1 "${prefix}_R1_001.fastq" -2 "${prefix}_R2_001.fastq" --validateMappings -o transcripts_quant
+done
+```
+
