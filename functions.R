@@ -89,7 +89,7 @@ run_deseq2_full <- function(df_mRNA, meta_data, model){
   keep <- rowSums(counts(dds)) >= 10
   dds <- dds[keep,]
   
-  dds <- DESeq(dds, parallel=TRUE)
+  dds <- DESeq(dds, parallel=FALSE)
   
   return(dds)
 }
@@ -120,7 +120,7 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
   
   dds <- DESeq(dds)
   
-  res <- results(dds, contrast = c(value, test,control))
+  res <- results(dds, contrast = c(value, test, control))
   
   return(new("DESeq2_return",
              res=res,

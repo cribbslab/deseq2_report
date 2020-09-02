@@ -40,9 +40,6 @@ if (file.exists("featurecounts.tsv.gz")) {
 if (file.exists(design_files[1])) {
   for (i in design_files){
   meta_data <- read.table(i, sep=",", header = TRUE) 
-  rownames(meta_data) <- meta_data$Sample
-  df_mRNA = df_mRNA[,rownames(meta_data)]
-  all(rownames(meta_data) %in% colnames(df_mRNA))
   assign(paste("meta_data", i, sep = "."), meta_data)
   }
 } else {
@@ -56,8 +53,11 @@ if (file.exists(design_files[1])) {
 
 for (i in design_files) {
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+  rownames(meta_data) <- meta_data$Sample
+  df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+  all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
   model <- as.character(meta_data$model[[1]])
-  dds <- run_deseq2_full(df_mRNA, meta_data, model)
+  dds <- run_deseq2_full(df_mRNA_tmp, meta_data, model)
   assign(paste("dds_full", i, sep = "."), dds)
 
 }
@@ -131,7 +131,7 @@ for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
   meta_data <- read.table(i, sep=",", header = TRUE) 
   one <- colnames(meta_data)[[2]]
-  two <- colnames(meta_data)[[3]]
+  two <- colnames(meta_data)[[4]]
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")
   print(plotPCA(vsd, intgroup=c(as.character(one),as.character(two))))

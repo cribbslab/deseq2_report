@@ -41,14 +41,12 @@ if (file.exists("featurecounts.tsv.gz")) {
 if (file.exists(design_files[1])) {
   for (i in design_files){
   meta_data <- read.table(i, sep=",", header = TRUE) 
-  rownames(meta_data) <- meta_data$Sample
-  df_mRNA = df_mRNA[,rownames(meta_data)]
-  all(rownames(meta_data) %in% colnames(df_mRNA))
   assign(paste("meta_data", i, sep = "."), meta_data)
   }
 } else {
     print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
-  }
+}
+
 
 ```
 
@@ -63,6 +61,7 @@ for (i in design_files) {
   value <- x[[1]][5]
   value <- gsub(".csv","",value)
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+  rownames(meta_data) <- meta_data$Sample
   model <- as.character(meta_data$model[[1]])
   
   if ("wald" == stat.test){

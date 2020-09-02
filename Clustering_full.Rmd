@@ -27,7 +27,7 @@ library(pheatmap)
 
 ```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
-design_files <- list.files(pattern = "design_full")
+design_files <- list.files(pattern = "full")
 
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
