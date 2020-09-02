@@ -1,23 +1,4 @@
 
-
-dds<- DESeqDataSetFromMatrix(countData=df_mRNA,
-                             colData=meta_data,
-                             design= ~treatment)
-
-# make the DeSeqDataSet
-dds <- DESeq(dds)
-
-# use the log transform on the data set
-rld <- rlog(dds, blind=F)
-topVarianceGenes <- head(order(rowVars(assay(rld)), decreasing=T),100)
-matrix <- assay(rld)
-[ topVarGenes ]
-matrix <- matrix - rowMeans(matrix)
-
-# select the 'contrast' you want
-annotation_data <- as.data.frame(colData(rld)[c("ConditionA","ConditionB")])
-pheatmap(matrix, annotation_col=annotation_data)
-
 plotUpDownSigGenes <- function(results, colNums, rld, title) {
   
   # make the lists
