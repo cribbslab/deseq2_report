@@ -179,7 +179,7 @@ plot_volcano <- function(res){
     arrange(input$padj)
   
   symbol_data <- head(input, 30)
-  
+
   #convert the rownames to a column
   volc = ggplot(input, aes(log2FoldChange, -log10(padj))) + #volcanoplot with log2Foldchange versus pvalue
     geom_point(aes(col=sig)) + #add points colored by significance
