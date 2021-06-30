@@ -22,7 +22,7 @@ library(knitr)
 library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
-knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
 ```
 
 
@@ -103,16 +103,25 @@ for (i in design_files){
 ```
 
 
-# Summary of the data 
+# Summary of the data {.tabset .tabset-fade}
 
 
-```{r, results='asis'}
+```{r, results='asis', echo = FALSE}
 k <- list()
 for (i in design_files){
   name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-    cat("### ",name,"\n")
-   print(summary(res, alpha=0.05))
+  cat("## ",name,"\n","\n")
+  res <- as.data.frame(res)
+  cat("Number of significant genes:","\n")
+  significance <- res %>% filter(padj < 0.05) %>% count()
+  cat(significance[1,],"\n")
+  cat("Number of upregulated significant genes log2 > 1:","\n")
+  significance <- res %>% filter(padj < 0.05 & log2FoldChange > 1) %>% count()
+  cat(significance[1,],"\n")
+  cat("Number of downregulated significant genes log2 < -1:","\n")
+  significance <- res %>% filter(padj < 0.05 & log2FoldChange < -1) %>% count()
+  cat(significance[1,],"\n")
   cat('\n\n')
 
 } 
@@ -120,7 +129,7 @@ for (i in design_files){
 ```
 
 
-## MA plots {.tabset .tabset-fade}
+# MA plots {.tabset .tabset-fade}
 
 In DESeq2, the function plotMA shows the log2 fold changes attributable to a given variable over the mean of normalized counts for all the samples in the DESeqDataSet. Points will be colored red if the adjusted p value is less than 0.01. Points which fall out of the window are plotted as open triangles pointing either up or down.
 
@@ -129,7 +138,7 @@ In DESeq2, the function plotMA shows the log2 fold changes attributable to a giv
 for (i in design_files){
   name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  cat("### ",name,"\n")
+  cat("## ",name,"\n")
   plt <- DESeq2::plotMA(res)
   print(plt)
   cat('\n\n')
@@ -137,7 +146,7 @@ for (i in design_files){
 
 ```
 
-## Volcano plots {.tabset .tabset-fade}
+# Volcano plots {.tabset .tabset-fade}
 
 
 
@@ -146,7 +155,7 @@ for (i in design_files){
 for (i in design_files){
   name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
-  cat("### ",name,"\n")
+  cat("## ",name,"\n")
   plt <- plot_volcano(res)
   print(plt)
   cat('\n\n')
@@ -155,7 +164,7 @@ for (i in design_files){
 
 ```
 
-## Histogram of pvalues {.tabset .tabset-fade}
+# Histogram of pvalues {.tabset .tabset-fade}
 
 ```{r, results='asis'}
 use <- res$baseMean > metadata(res)$filterThreshold

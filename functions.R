@@ -270,3 +270,92 @@ scale_colour_Publication <- function(...){
   discrete_scale("colour","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
   
 }
+
+
+pca <- function(vsd, gene_prop = 1, batch = NA, 
+                       remove_batch_effect = FALSE){
+  
+  ##Using PCAtools 
+  
+  ###Number of genes to use in PCA
+  if(gene_prop < 0 | gene_prop > 1){stop("gene_prop must be between 0 and 1")}
+  
+  selectgenes <- floor(gene_prop * nrow(vsd))
+  
+  
+  
+  ##To correct for batch effect: 
+  if(is.na(batch) & remove_batch_effect){stop("Batch column must be provided to remove batch effect")}
+  if(remove_batch_effect){
+    assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd[[batch]])
+  }
+  
+  
+  ##Run PCA       
+  pca_data <- PCAtools::pca(mat = assay(vsd), 
+                            metadata = colData(vsd), 
+                            removeVar = (1-gene_prop)) 
+  return(pca_data)
+}
+
+pca_biplot <- function(pca_data, vsd, gene_prop = 1, design, batch = NA, title, 
+                       remove_batch_effect = FALSE){
+  
+  selectgenes <- floor(gene_prop * nrow(vsd))
+  
+  ##plot PC1 vs PC2
+  Biplot <- biplot(pca_data, 
+                   showLoadings = FALSE, 
+                   lab = NULL,
+                   #lab = pca_data$metadata$rowid,
+                   #drawConnectors = TRUE,
+                   #boxedLabels = TRUE,
+                   #labhjust = 2,
+                   #labvjust = 4,
+                   colby = design, 
+                   #shape = NULL,
+                   shape = if(!is.na(batch)){batch},
+                   #encircle = TRUE,
+                   #ellipse = TRUE,
+                   #ellipseConf = 0.95,
+                   #ellipseFill = TRUE,
+                   #ellipseAlpha = 1/4,
+                   #ellipseLineSize = 1.0,
+                   #showLoadingsNames = TRUE,
+                   #boxedLoadingsNames = TRUE,
+                   #ntopLoadings = 10,
+                   #sizeLoadingsNames = 2,
+                   #colLoadingsNames = "black",
+                   #fillBoxedLoadings = "white",
+                   #drawConnectorsLoadings = TRUE,
+                   #alphaLoadingsArrow = 1,
+                   #lengthLoadingsArrowsFactor = 1,
+                   #legendPosition = 'right', 
+                   legendLabSize = 10, 
+                   legendIconSize = 4.0) %>%
+    
+    ggpar( title = title,
+           caption = paste0("PCA using: ", selectgenes, " genes") ,
+           legend = "right",
+           legend.title = list(color = design, shape = batch),
+           palette = c("red4", "blue4", "green4", "orange", "black", "brown", "violet"),
+           shapekey = c(20, 4, 6),
+           font.title = c("bold", "brown", 18),
+           font.subtitle = c("bold", "dark grey", 12),
+           font.caption = c("bold.italic", "royal blue", 10),
+           font.legend = c("bold", "black", 8),
+           font.x = c("bold", "black", "11"), 
+           font.y = c("bold", "black", "11"),
+           font.tickslab = c("bold", "black", "8"),
+           font.family = "Arial",
+           x.text.angle = 0,
+           ggtheme = theme_pubr()
+    )
+  #Bp <<- Biplot
+  #return(Bp)
+  ifelse(remove_batch_effect,
+         Biplot$labels$subtitle <- paste0(Biplot$labels$subtitle, ", batch corrected"),
+         FALSE)
+  return(Biplot)  
+  #ggsave(paste0(plots_dir, title, ifelse(remove_batch_effect, "_batch_corrected_", "_"), "PCA_all_samples.png"))
+}

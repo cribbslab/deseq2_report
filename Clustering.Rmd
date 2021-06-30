@@ -14,7 +14,7 @@ We define the term quality as fitness for purpose. Our purpose is the detection 
 In this page, you will see all of the analysis performed to understand which samples are potentially going to negatively impact the downstream analysis.
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(cache=TRUE, results='asis')
+knitr::opts_chunk$set(cache=FALSE, results='asis')
 source('functions.R')
 library(org.Hs.eg.db)
 library(DESeq2)
@@ -22,6 +22,8 @@ library(pheatmap)
 library(dplyr)
 library(RColorBrewer)
 library(pheatmap)
+library(PCAtools)
+library(ggpubr)
 ```
 
 
@@ -119,22 +121,33 @@ for (i in design_files) {
 
 ```
 
+```{r, include=FALSE}
+for (i in design_files) {
+  vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
+  meta_data <- read.table(i, sep=",", header = TRUE) 
+  name <-  gsub(".csv","",i)
+  pca_plot <- pca(vsd = vsd)
+  assign(paste("pca_plot", i, sep = "."), pca_plot)
+}
+
+```
 
 # PCA analysis of the samples {.tabset .tabset-fade}
 
 Related to the distance matrix is the PCA plot, which shows the samples in the 2D plane spanned by their first two principal components. This type of plot is useful for visualizing the overall effect of experimental covariates and batch effects.
 
-## PCA - group
 
-```{r , echo=FALSE}
+```{r , echo=FALSE, messages=FALSE}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
+  pca_plot <- get(gsub("SAMPLE_FILE",i , "pca_plot.SAMPLE_FILE"))
   meta_data <- read.table(i, sep=",", header = TRUE) 
-  one <- colnames(meta_data)[[2]]
-  two <- colnames(meta_data)[[4]]
   name <-  gsub(".csv","",i)
-  cat("### ",name,"\n")
-  print(plotPCA(vsd, intgroup=c(as.character(one),as.character(two))))
+  cat("## ",name,"\n")
+  print(pca_biplot(pca_plot,vsd,
+           design = colnames(meta_data)[[2]],
+           title = i,
+           batch = NA))
   cat('\n\n')
 }
 ```

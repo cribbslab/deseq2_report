@@ -10,6 +10,13 @@ library(enrichR)
 knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
 ```
 
+
+# EnrichR analysis
+
+EnrichR provides an R interface to all 'Enrichr' databases. 'Enrichr' is a web-based tool for analysing gene sets and returns any enrichment of common annotated biological features.
+
+The output of the enrichment analysis can be found in enrichment/
+
 ```{r}
 dbs <- listEnrichrDbs()
 dbs <- c("GO_Molecular_Function_2015", "GO_Cellular_Component_2015", "GO_Biological_Process_2015" , "ChEA_2016" ,"KEGG_2016")
@@ -36,6 +43,4 @@ for (i in files) {
 }
 ```
 
-# Enrichment
 
-The EnrichR enrichment output files can be found within the directory "enrichment/"
