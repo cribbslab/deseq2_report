@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+results/*
+*_cache/
+Final_report/
