@@ -5,3 +5,8 @@
 results/*
 *_cache/
 Final_report/
+*_files/
+TranscriptionFactors/
+enrichment/
+site_libs/
+gencode.gtf.gz

@@ -10,11 +10,12 @@ output:
 library(pheatmap)
 library(tidyverse)
 source('functions.R')
-source('Heatmap.R')
 ```
 
 
 # Transcription factor analysis
+
+The aim of this code is to subset each transcription factor from your significant results and place the results of that into the folder TranscriptionFactors/
 
 ```{r}
 TF <- read.csv("TF.csv", header = T)
@@ -22,7 +23,7 @@ TF <- TF %>% filter(X == "Yes") %>% select(Name)
 ```
 
 ```{r}
-design_files <- list.files(path="results_6hr/",pattern = "design.*sig.csv")
+design_files <- list.files(path="results", pattern = "(design_)*res\\.csv$")
 
 for (i in design_files) {
  df <- read.csv(paste0("results/",i), header=T)
@@ -31,65 +32,4 @@ for (i in design_files) {
  write.csv(df_new, file=paste0("TranscriptionFactors/",i))
   }
 
-```
-
-# Plot transcription factors
-
-
-```{r}
-
-design_files <- list.files(pattern = "full")
-
-if (file.exists("featurecounts.tsv.gz")) {
-  df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
-  colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
-} else {
-  print("Please add featurecounts.tsv.gz into the project folder as it seems to be missing")
-}
-
-
-if (file.exists(design_files[1])) {
-  for (i in design_files){
-  meta_data <- read.table(i, sep=",", header = TRUE) 
-  rownames(meta_data) <- meta_data$Sample
-  df_mRNA.reduced = df_mRNA[,rownames(meta_data)]
-  all(rownames(meta_data) %in% colnames(df_mRNA.reduced))
-  assign(paste("meta_data", i, sep = "."), meta_data)
-  assign(paste("df_mRNA", i, sep = "."), df_mRNA.reduced)
-  }
-} else {
-    print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
-  }
-
-```
-
-```{r , include=FALSE}
-
-for (i in design_files) {
-  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
-  model <- as.character(meta_data$model[[1]])
-  dds <- run_deseq2_full(df_mRNA, meta_data, model)
-  assign(paste("dds_full", i, sep = "."), dds)
-
-}
-```
-
-
-```{r}
-
-genes <- read.table("HS_List.txt")
-genes <- read.table("ATF4_List.txt")
-
-genes <- c(genes1, genes2)
-genes <- toupper(genes$V1)
-
-vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
-meta_data <- read.table("full.csv", sep=",", header = TRUE) 
-annotation <- data.frame(Day = meta_data[[3]], Compound = meta_data[[2]], isrib = meta_data[[4]])
-
-rownames(annotation) <- colnames(assay(vsd))
-
-tiff("HS_genes.tiff", height = 2500, width = 2000, res = 600)
-plot_TF_heatmap(dds, genes, annotation)
-dev.off()
 ```

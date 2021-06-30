@@ -27,7 +27,7 @@ library(pheatmap)
 
 ```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
-design_files <- list.files(pattern = "full")
+design_files <- list.files(pattern = "full.csv")
 
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
@@ -140,66 +140,4 @@ for (i in design_files) {
 ```
 
 
-# Calculate TMP values
-
-
-In order to calculate the tpm values you need to run the script python/tmp.py to work out the gene lengths for
-your given genome. This can be accomplished using the documentation given within tmp.py.
-
-```{r}
-library(RCurl)
-
-# Mouse
-#url = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_mouse/release_M26/gencode.vM26.annotation.gtf.gz"
-# Human
-url = "ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_37/gencode.v37.annotation.gtf.gz"
-
-download.file(url, paste(getwd(), "/", "gencode.gtf.gz", sep = ""))
-
-
-library(GenomicFeatures) 
-txdb <- makeTxDbFromGFF("gencode.gtf.gz",format="gtf")
-exons.list.per.gene <- exonsBy(txdb,by="gene")
-featureLength <- as.data.frame(sum(width(reduce(exons.list.per.gene))))
-
-
-counts <- as.data.frame(counts(dds))
-
-featureLength <- featureLength %>% tibble::rownames_to_column("ens") 
-
-featureLength <- featureLength %>% tidyr::separate(ens, c("ensembl","version"))
-
-featureLength$version <- NULL
-rownames(featureLength) <- featureLength$ensembl 
-featureLength$ensembl <- NULL
-
-features = featureLength[order(as.numeric(row.names(counts))) ,]
-
-Counts_to_tpm <- function(counts, featureLength) {
-
-  # Ensure valid arguments.
-  stopifnot(length(featureLength) == nrow(counts))
-
-  # Compute effective lengths of features in each library.
-  effLen <- featureLength
-
-  # Process one column at a time.
-  tpm <- do.call(cbind, lapply(1:ncol(counts), function(i) {
-    rate = log(counts[,i]) - log(effLen)
-    denom = log(sum(exp(rate)))
-    exp(rate - denom + log(1e6))
-  }))
-
-  # Copy the row and column names from the original matrix.
-  colnames(tpm) <- colnames(counts)
-  rownames(tpm) <- rownames(counts)
-  return(tpm)
-}
-
-tpm <- Counts_to_tpm(counts, features$`sum(width(reduce(exons.list.per.gene)))`)
-
-write.csv(tpm, file="tpm.csv")
-write.csv(counts, file="counts.csv")
-write.csv(counts(dds, normalized=TRUE), file="counts_normalised.csv")
-```
 
