@@ -8,14 +8,14 @@ output:
 ```{r, include=FALSE}
 library(XGR)
 library(DT)
-knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE, error=FALSE)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis')
 ```
 
 
 # Reactome
 
 
-```{r}
+```{r,warning=FALSE,message=FALSE,error=FALSE}
 
 files <- Sys.glob("results/*sig.csv")
 
@@ -38,15 +38,23 @@ for (i in files) {
   dir.create(file.path("enrichment_XGR", ontology), showWarnings = FALSE)
   output <- paste0("enrichment_XGR","/", ontology, "/", name, ".csv")
   write.csv(file=as.character(output), as.data.frame(xEnrichViewer(eTerm)))
+  assign(paste("eTerm", i, sep = "."), eTerm)
   }
 ```
 
-### Bar plot of the enrichment
+### Bar plot of the enrichment {.tabset .tabset-fade}
 
 ```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
+for (i in files) {
+  eTerm <- get(gsub("SAMPLE_FILE",i , "eTerm.SAMPLE_FILE"))
+  bp <- xEnrichBarplot(eTerm, top_num="auto", displayBy="adjp")
+  name <-  gsub(".csv","",i)
+  
+  cat("#### ",name,"\n")
+  print(bp)
+  cat('\n\n')
+}
 
-bp <- xEnrichBarplot(eTerm, top_num="auto", displayBy="adjp")
-print(bp)
 ```
 
 ## KEGG
@@ -73,13 +81,19 @@ for (i in files) {
   dir.create(file.path("enrichment_XGR", ontology), showWarnings = FALSE)
   output <- paste0("enrichment_XGR","/", ontology, "/", name, ".csv")
   write.csv(file=as.character(output), as.data.frame(xEnrichViewer(eTerm)))
+  assign(paste("eTerm", i, sep = "."), eTerm)
   }
 ```
 
-### Bar plot of the enrichment
+### Bar plot of the enrichment {.tabset .tabset-fade}
 
-```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE}
-
-bp <- xEnrichBarplot(eTerm, top_num="auto", displayBy="adjp")
-print(bp)
+```{r,echo=FALSE,warning=FALSE,message=FALSE,error=FALSE, results='asis'}
+for (i in files) {
+  eTerm <- get(gsub("SAMPLE_FILE",i , "eTerm.SAMPLE_FILE"))
+  bp <- xEnrichBarplot(eTerm, top_num="auto", displayBy="adjp")
+  name <-  gsub(".csv","",i)
+  cat("####",name,"\n")
+  print(bp)
+  cat('\n\n')
+}
 ```
