@@ -22,6 +22,12 @@ library(knitr)
 library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
+
+library(msigdbr)
+library(fgsea)
+#library(multiGSEA)
+library(EGSEA)
+
 knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
 ```
 
@@ -197,6 +203,7 @@ for (i in design_files){
   table <- dt@sig
   new_list[[paste0("dt_",name,sep="")]] <- table
   names <- c(names, name)
+  assign(paste("sig", i, sep = "."), dt@sig)
 } 
 df <- data.frame(cbind(new_list, classification=names))
 
@@ -218,3 +225,23 @@ for(j in unique(df$classification)){ # You were using level() here, so your for-
 }
 ```
 
+
+
+# Annotate results
+
+```{r}
+for (i in design_files){
+  name.start <-  gsub(".csv","",i)
+  res <- get(gsub("SAMPLE_FILE",i , "sig.SAMPLE_FILE"))
+  if(any(dim(res)[1] == 0)){
+    
+  }else{
+  rownames(res) <- res$Row.names
+  res_tmp <- Annotate_genes_results(res)
+  sig_name = paste("results/", name.start,"_annotate_sig.csv", sep="")
+  write.csv(res_tmp, sig_name)
+  assign(paste("sig", i, sep = "."), res)
+    
+  }
+}
+```

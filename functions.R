@@ -359,3 +359,266 @@ pca_biplot <- function(pca_data, vsd, gene_prop = 1, design, batch = NA, title,
   return(Biplot)  
   #ggsave(paste0(plots_dir, title, ifelse(remove_batch_effect, "_batch_corrected_", "_"), "PCA_all_samples.png"))
 }
+
+Plot_pca_loadings <- function(vsd, 
+                              gene_prop = 1, 
+                              nPCs = 6,
+                              title = Plot_title,
+                              batch = NA,
+                              remove_batch_effect = FALSE,
+                              results_dir = "results_pca/"
+) {
+  
+  dir.create(file.path(results_dir), showWarnings = FALSE)
+  ##Using PCAtools 
+  
+  ###Number of genes to use in PCA
+  if(gene_prop < 0 | gene_prop > 1){stop("gene_prop must be between 0 and 1")}
+  
+  selectgenes <- floor(gene_prop * nrow(vsd))
+  
+  ##To correct for batch effect: 
+  if(is.na(batch) & remove_batch_effect){stop("Batch column must be provided to remove batch effect")}
+  if(remove_batch_effect){
+    assay(vsd) <- limma::removeBatchEffect(assay(vsd), vsd[[batch]])
+  }
+  
+  
+  
+  
+  ##Run PCA       
+  pca_data <- PCAtools::pca(mat = assay(vsd), 
+                            metadata = colData(vsd), 
+                            removeVar = (1-gene_prop)) 
+  
+  ##Create a data.frame of selected PC loadings
+  Loads_PCs <- PCAtools::getLoadings(pca_data, 1) %>% 
+    as.data.frame() %>%
+    tibble::rownames_to_column("ensembl_gene_id")
+  
+  for (i in 2:nPCs) {
+    Loads_PCs <- Loads_PCs %>% dplyr::mutate(getLoadings(pca_data, i))
+    
+  }
+  
+  ##save in results folder
+  write.table(Loads_PCs,
+              paste0(results_dir, title, ifelse(remove_batch_effect, "_batch_corrected_", "_"),
+                     "PCA_loadings.tsv"),
+              col.name=TRUE,
+              sep="\t",
+              na = "NA",
+              row.names=FALSE,
+              quote=FALSE)
+  
+  ##Make a loadings plot for selected loadings
+  PLoadings <- plotloadings(pca_data,
+                            components = getComponents(pca_data, 1:nPCs),
+                            rangeRetain = 0.1,
+                            labSize = 3.0,
+                            #title = 'Loadings plot',
+                            #subtitle = 'PC1, PC2',
+                            #caption = 'Top 10% variables',
+                            shape = 23,
+                            shapeSizeRange = 1,1,
+                            col = c("dark red", "white", "dark blue"),
+                            colMidpoint = 0,
+                            
+                            drawConnectors = TRUE,
+                            lengthConnectors = unit(0.005, "npc"),
+                            positionConnectors = "right",
+                            #labvjust = 0.5, 
+                            
+  ) %>%
+    
+    
+    ggpar( title = title,
+           subtitle = "All samples",
+           caption = "PC Loadings - Top 10% variables: ",
+           legend = "right",
+           font.title = c("bold", "brown", 18),
+           font.subtitle = c("bold", "dark grey", 14),
+           font.caption = c("bold.italic", "royal blue", 10),
+           font.legend = c("bold", "black", 8),
+           font.x = c("bold", "black", "11"), 
+           font.y = c("bold", "black", "11"),
+           font.tickslab = c("bold", "black", "8"),
+           font.family = "Comic Sans MS",
+           x.text.angle = 0,
+           
+           
+           
+           ggtheme = theme_pubr()
+           
+    )
+  
+  
+  return(PLoadings)
+  ##ggsave(paste0(plots_dir, title, ifelse(remove_batch_effect, "_batch_corrected", FALSE), "_PCA_all_samples.png"))
+  
+}
+
+
+
+GSEA_plots <-  function(pathways, title, control, test){
+  
+  ##read in the annotated results table
+  results_annotated <- read.delim(paste0(results_dir,"deseq2_results_annotated.tsv")) %>% 
+    as.data.frame()
+  
+  ##create ranked gene list for fgsea
+  gseaInput <-  results_annotated %>% 
+    dplyr::filter(!is.na(ENTREZID), !is.na(stat)) %>% 
+    arrange(stat)
+  
+  ranks <- pull(gseaInput,stat)
+  names(ranks) <- gseaInput$hgnc_symbol
+  
+  
+  ###choose pathway databases to load. 
+  
+  ##REACTOME GENE SETS
+  HS_CP_REACTOME <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+  HS_CP_REACTOME <- split(x = HS_CP_REACTOME$gene_symbol, f = HS_CP_REACTOME$gs_name)
+  
+  
+  ##HALLMARKS GENE SETS
+  HS_HALLMARK <- msigdbr(species = "Homo sapiens", category = "H")
+  HS_HALLMARK <- split(x = HS_HALLMARK$gene_symbol, f = HS_HALLMARK$gs_name)
+  
+  ##KEGG GENE SETS
+  HS_CP_KEGG <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+  HS_CP_KEGG <- split(x = HS_CP_KEGG$gene_symbol, f = HS_CP_KEGG$gs_name)
+  
+  
+  ##Choose gene sets list
+  #pathways <- HS_HALLMARK
+  pathway_dbs <- list("HS_HALLMARK" = HS_HALLMARK, "HS_CP_KEGG" = HS_CP_KEGG, "HS_CP_REACTOME" = HS_CP_REACTOME)
+  a <-c("HS_HALLMARK", "HS_CP_KEGG", "HS_CP_REACTOME")
+  b <- a[str_which(a, str_to_upper(pathways))]
+  pathways <- pathway_dbs[[b]]
+  ##GSEA analysis using the "ranks" table against the pathways in the database.
+  
+  fgseaRes <- fgsea(pathways, ranks, minSize=15, maxSize = 500, nperm=1000)
+  
+  
+  
+  ## Show results in a nice table
+  
+  fgseaResTidy <- fgseaRes %>%
+    as_tibble() %>%
+    arrange(desc(NES)) %>%
+    dplyr::filter(padj <= 0.05) %>%
+    dplyr::mutate(Pathway = str_replace_all(pathway, "_", " "),
+                  Adjusted_p_value = padj, 
+                  Normalised_Enrichment_Score = NES,
+                  Size = size,
+                  Key_genes = leadingEdge) %>%
+    dplyr::select(Pathway, Normalised_Enrichment_Score, Size, Adjusted_p_value) 
+  #%>% dplyr::filter(abs(Normalised_Enrichment_Score) > 2.3)
+  
+  ##save results table
+  #return(fgseaResTidy)
+  write.table(fgseaResTidy,
+              file = paste0(results_dir, "fgsea_", b ,"_pathways.tsv"),
+              col.name=TRUE,
+              sep="\t",
+              na = "NA",
+              append = FALSE,
+              row.names=FALSE,
+              quote=FALSE)
+  
+  
+  
+  
+  ##kable table of results
+  FGSEA_Results <- fgseaResTidy %>% kbl(col.names = c("Pathway", "Normalised Enrichment Score", "Size", "Adjusted p-value"), 
+                                        caption = "L363 Car-resistant cells, Top Differentially Expressed Pathways",
+                                        digits = 2,
+                                        escape = F, 
+                                        align = "c"
+  ) %>% 
+    kable_paper(html_font = "Comic Sans MS",
+                full_width = T, bootstrap_options = c("striped", "bordered", "hover")) %>%
+    column_spec(2, color = "white", background = ifelse(fgseaResTidy$Normalised_Enrichment_Score < 0, "red", "green")) %>% footnote("Using Kable")
+  
+  
+  
+  ###Plots enrichment scores
+  
+  FGSEA_plot <- (ggbarplot(fgseaResTidy,
+                           x = "Pathway",
+                           y = "Normalised_Enrichment_Score",
+                           fill = "Adjusted_p_value",
+                           #fill = "Size",
+                           #palette = "jco",
+                           sort.val = "desc",
+                           label = FALSE,
+                           xlab = FALSE,
+                           size = 1,
+                           width = 1,
+  )
+  + scale_x_discrete(labels = function(x) str_wrap(x, 15))
+  
+  + scale_fill_steps(
+    low = "#132B43",
+    high = "#56B1F7",
+    space = "Lab",
+    na.value = "grey50",
+    guide = "coloursteps",
+    aesthetics = "fill",
+    name = "P-value",
+    n.breaks = 5
+  )) %>%
+    
+    ggpar(#legend.title = list(color = "P-values"),
+      rotate = TRUE,
+      title = title,
+      submain = paste0(control, " vs ", test),
+      caption = paste0("GSEA with ", pathways, " gene sets from MSigDB"),
+      ggtheme = theme_pubr(),
+      #ggtheme = theme(legend.direction = "vertical"),
+      xlab = "",
+      ylab = "Normalized Enrichment Score",
+      font.title = c("bold", "brown", 18),
+      font.subtitle = c("bold", "dark grey", 14),
+      font.caption = c("bold.italic", "royal blue", 12),
+      font.legend = c("bold", "black", 6),
+      font.x = c("bold", "black", "11"),
+      #x.text.angle = 90,
+      font.y = c("bold", "black", "11"),
+      font.tickslab = c("bold", "black", "8"),
+      font.family = "Calibri",
+      
+    )
+  
+  FGSEA_plot
+  #ggsave(plots_dir, title, "_", pathways, "_FGSEA_plot.png")
+  GSEA_return <- list(FGSEA_Results, FGSEA_plot)
+  return(GSEA_return)
+  
+}
+
+
+Annotate_genes_results <- function(res){
+  
+  
+  res$GENENAME <- mapIds(org.Hs.eg.db,
+                         keys=row.names(res),
+                         column="GENENAME",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+  res$SYMBOL <- mapIds(org.Hs.eg.db,
+                       keys=row.names(res),
+                       column="SYMBOL",
+                       keytype="ENSEMBL",
+                       multiVals="first")
+  
+  res$ENTREZID <- mapIds(org.Hs.eg.db,
+                         #EnsDb.Hsapiens.v86,
+                         keys=row.names(res),
+                         column="ENTREZID",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+  return(res)
+}

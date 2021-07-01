@@ -151,3 +151,14 @@ for (i in design_files) {
   cat('\n\n')
 }
 ```
+
+
+# PCA Loadings of the samples {.tabset .tabset-fade}
+
+```{r}
+Plot_pca_loadings(vsd = vsd,
+                  nPCs = 6,
+                  gene_prop = 1,
+                  title = "Plot_title")
+
+```
