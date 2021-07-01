@@ -1,0 +1,45 @@
+---
+title: "GSEA"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+library(msigdbr)
+library(fgsea)
+#library(multiGSEA)
+library(EGSEA)
+knitr::opts_chunk$set(echo = TRUE)
+design_files <- list.files(pattern = "design_")
+```
+
+# GSEA rank list
+
+```{r}
+for (i in design_files){
+  res_name = paste("results/", i,"_annotate_res.csv", sep="")
+  if(file.exists(res_name)){
+    results_annotated = read.csv(res_name)
+  }
+
+  dir.create("results_rnk/", showWarnings = FALSE)
+  results_dir = paste("results_rnk/", i,".rnk", sep="")
+  gsea_rnk(results_annotated=results_annotated, results_dir=results_dir)
+}
+```
+
+# GSEA run 
+
+```{r}
+pathways <- "Hallmark"
+title = "test"
+dir.create("results_gsea/", showWarnings = FALSE)
+res_name = paste("results/", i,"_annotate_res.csv", sep="")
+res_name = "results/design_wald_DMSO_MAZ1392_compound_annotate_res.csv"
+if(file.exists(res_name)){
+    results_dir = read.csv(res_name)
+  }
+GSEA_plots(pathways, title, results_dir)
+
+```

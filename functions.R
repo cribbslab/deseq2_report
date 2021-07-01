@@ -622,3 +622,155 @@ Annotate_genes_results <- function(res){
                          multiVals="first")
   return(res)
 }
+
+
+gsea_rnk <- function(results_annotated, results_dir){
+
+gseaInput <-  results_annotated %>% 
+  dplyr::filter(!is.na(ENTREZID), !is.na(log2FoldChange)) %>% 
+  arrange(log2FoldChange)
+
+
+gsea_input_rnk <- dplyr::select(gseaInput, ENTREZID, log2FoldChange)
+
+write.table(gsea_input_rnk, results_dir,col.name=FALSE,sep="\t",row.names=FALSE,quote=FALSE)
+
+}
+
+
+GSEA_plots <-  function(pathways, title, results_dir, control="control", test="test"){
+  
+  ##read in the annotated results table
+  results_annotated <- results_dir
+  
+  ##create ranked gene list for fgsea
+  gseaInput <-  results_annotated %>% 
+    dplyr::filter(!is.na(ENTREZID), !is.na(log2FoldChange)) %>% 
+    arrange(log2FoldChange)
+
+  ranks <- pull(gseaInput,log2FoldChange)
+  names(ranks) <- gseaInput$SYMBOL
+  
+  
+  ###choose pathway databases to load. 
+  
+  ##REACTOME GENE SETS
+  HS_CP_REACTOME <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+  HS_CP_REACTOME <- split(x = HS_CP_REACTOME$gene_symbol, f = HS_CP_REACTOME$gs_name)
+  
+  
+  ##HALLMARKS GENE SETS
+  HS_HALLMARK <- msigdbr(species = "Homo sapiens", category = "H")
+  HS_HALLMARK <- split(x = HS_HALLMARK$gene_symbol, f = HS_HALLMARK$gs_name)
+  
+  ##KEGG GENE SETS
+  HS_CP_KEGG <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+  HS_CP_KEGG <- split(x = HS_CP_KEGG$gene_symbol, f = HS_CP_KEGG$gs_name)
+  
+  
+  ##Choose gene sets list
+  #pathways <- HS_HALLMARK
+  pathway_dbs <- list("HS_HALLMARK" = HS_HALLMARK, "HS_CP_KEGG" = HS_CP_KEGG, "HS_CP_REACTOME" = HS_CP_REACTOME)
+  a <-c("HS_HALLMARK", "HS_CP_KEGG", "HS_CP_REACTOME")
+  b <- a[str_which(a, str_to_upper(pathways))]
+  pathways <- pathway_dbs[[b]]
+  ##GSEA analysis using the "ranks" table against the pathways in the database.
+  
+  fgseaRes <- fgsea(pathways, ranks, minSize=15, maxSize = 500, nperm=1000)
+  
+  
+  
+  ## Show results in a nice table
+  
+  fgseaResTidy <- fgseaRes %>%
+    as_tibble() %>%
+    arrange(desc(NES)) %>%
+    dplyr::filter(padj <= 0.05) %>%
+    dplyr::mutate(Pathway = str_replace_all(pathway, "_", " "),
+                  Adjusted_p_value = padj, 
+                  Normalised_Enrichment_Score = NES,
+                  Size = size,
+                  Key_genes = leadingEdge) %>%
+    dplyr::select(Pathway, Normalised_Enrichment_Score, Size, Adjusted_p_value) 
+  #%>% dplyr::filter(abs(Normalised_Enrichment_Score) > 2.3)
+  
+  ##save results table
+  #return(fgseaResTidy)
+  write.table(fgseaResTidy,
+              file = paste0("results_gsea/", title, "_fgsea_", b ,"_pathways.tsv"),
+              col.name=TRUE,
+              sep="\t",
+              na = "NA",
+              append = FALSE,
+              row.names=FALSE,
+              quote=FALSE)
+  
+  
+  
+  
+  ##kable table of results
+  FGSEA_Results <- fgseaResTidy %>% kbl(col.names = c("Pathway", "Normalised Enrichment Score", "Size", "Adjusted p-value"),
+                                        digits = 2,
+                                        escape = F, 
+                                        align = "c"
+  ) %>% 
+    kable_paper(html_font = "Comic Sans MS",
+                full_width = T, bootstrap_options = c("striped", "bordered", "hover")) %>%
+    column_spec(2, color = "white", background = ifelse(fgseaResTidy$Normalised_Enrichment_Score < 0, "red", "green")) %>% footnote("Using Kable")
+  
+  
+  
+  ###Plots enrichment scores
+  
+  FGSEA_plot <- (ggbarplot(fgseaResTidy,
+                           x = "Pathway",
+                           y = "Normalised_Enrichment_Score",
+                           fill = "Adjusted_p_value",
+                           #fill = "Size",
+                           #palette = "jco",
+                           sort.val = "desc",
+                           label = FALSE,
+                           xlab = FALSE,
+                           size = 1,
+                           width = 1,
+  )
+  + scale_x_discrete(labels = function(x) str_wrap(x, 15))
+  
+  + scale_fill_steps(
+    low = "#132B43",
+    high = "#56B1F7",
+    space = "Lab",
+    na.value = "grey50",
+    guide = "coloursteps",
+    aesthetics = "fill",
+    name = "P-value",
+    n.breaks = 5
+  )) %>%
+    
+    ggpar(#legend.title = list(color = "P-values"),
+      rotate = TRUE,
+      title = title,
+      submain = paste0(control, " vs ", test),
+      caption = paste0("GSEA with ", pathways, " gene sets from MSigDB"),
+      ggtheme = theme_pubr(),
+      #ggtheme = theme(legend.direction = "vertical"),
+      xlab = "",
+      ylab = "Normalized Enrichment Score",
+      font.title = c("bold", "brown", 18),
+      font.subtitle = c("bold", "dark grey", 14),
+      font.caption = c("bold.italic", "royal blue", 12),
+      font.legend = c("bold", "black", 6),
+      font.x = c("bold", "black", "11"),
+      #x.text.angle = 90,
+      font.y = c("bold", "black", "11"),
+      font.tickslab = c("bold", "black", "8"),
+      font.family = "Arial",
+      
+    )
+  
+  FGSEA_plot
+  #ggsave(plots_dir, title, "_", pathways, "_FGSEA_plot.png")
+  GSEA_return <- list(FGSEA_Results, FGSEA_plot)
+  return(GSEA_return)
+  
+}

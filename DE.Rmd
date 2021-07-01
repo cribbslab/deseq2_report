@@ -23,11 +23,6 @@ library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
 
-library(msigdbr)
-library(fgsea)
-#library(multiGSEA)
-library(EGSEA)
-
 knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
 ```
 
@@ -204,6 +199,7 @@ for (i in design_files){
   new_list[[paste0("dt_",name,sep="")]] <- table
   names <- c(names, name)
   assign(paste("sig", i, sep = "."), dt@sig)
+  assign(paste("res", i, sep = "."), dt@res)
 } 
 df <- data.frame(cbind(new_list, classification=names))
 
@@ -244,4 +240,20 @@ for (i in design_files){
     
   }
 }
+
+for (i in design_files){
+  name.start <-  gsub(".csv","",i)
+  res <- as.data.frame(get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE")))
+  if(any(dim(res)[1] == 0)){
+    
+  }else{
+  rownames(res) <- make.unique(res$Row.names)
+  res_tmp <- Annotate_genes_results(res)
+  sig_name = paste("results/", name.start,"_annotate_res.csv", sep="")
+  write.csv(res_tmp, sig_name)
+  assign(paste("res", i, sep = "."), res)
+    
+  }
+}
 ```
+

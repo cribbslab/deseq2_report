@@ -13,3 +13,5 @@ gencode.gtf.gz
 enrichment_XGR/
 .DS_Store
 results_pca/
+results_gsea/
+results_rnk/
