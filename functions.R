@@ -460,19 +460,18 @@ Plot_pca_loadings <- function(vsd,
 
 
 
-GSEA_plots <-  function(pathways, title, control, test){
+GSEA_plots <-  function(pathways, title, results_dir){
   
   ##read in the annotated results table
-  results_annotated <- read.delim(paste0(results_dir,"deseq2_results_annotated.tsv")) %>% 
-    as.data.frame()
+  results_annotated <- results_dir
   
   ##create ranked gene list for fgsea
   gseaInput <-  results_annotated %>% 
-    dplyr::filter(!is.na(ENTREZID), !is.na(stat)) %>% 
-    arrange(stat)
+    dplyr::filter(!is.na(ENTREZID), !is.na(log2FoldChange)) %>% 
+    arrange(log2FoldChange)
   
-  ranks <- pull(gseaInput,stat)
-  names(ranks) <- gseaInput$hgnc_symbol
+  ranks <- pull(gseaInput,log2FoldChange)
+  names(ranks) <- gseaInput$SYMBOL
   
   
   ###choose pathway databases to load. 
@@ -520,7 +519,7 @@ GSEA_plots <-  function(pathways, title, control, test){
   ##save results table
   #return(fgseaResTidy)
   write.table(fgseaResTidy,
-              file = paste0(results_dir, "fgsea_", b ,"_pathways.tsv"),
+              file = paste0("results_gsea/", title, "fgsea_", b ,"_pathways.tsv"),
               col.name=TRUE,
               sep="\t",
               na = "NA",
@@ -530,72 +529,73 @@ GSEA_plots <-  function(pathways, title, control, test){
   
   
   
-  
-  ##kable table of results
-  FGSEA_Results <- fgseaResTidy %>% kbl(col.names = c("Pathway", "Normalised Enrichment Score", "Size", "Adjusted p-value"), 
-                                        caption = "L363 Car-resistant cells, Top Differentially Expressed Pathways",
-                                        digits = 2,
-                                        escape = F, 
-                                        align = "c"
-  ) %>% 
-    kable_paper(html_font = "Comic Sans MS",
-                full_width = T, bootstrap_options = c("striped", "bordered", "hover")) %>%
-    column_spec(2, color = "white", background = ifelse(fgseaResTidy$Normalised_Enrichment_Score < 0, "red", "green")) %>% footnote("Using Kable")
-  
-  
-  
-  ###Plots enrichment scores
-  
-  FGSEA_plot <- (ggbarplot(fgseaResTidy,
-                           x = "Pathway",
-                           y = "Normalised_Enrichment_Score",
-                           fill = "Adjusted_p_value",
-                           #fill = "Size",
-                           #palette = "jco",
-                           sort.val = "desc",
-                           label = FALSE,
-                           xlab = FALSE,
-                           size = 1,
-                           width = 1,
-  )
-  + scale_x_discrete(labels = function(x) str_wrap(x, 15))
-  
-  + scale_fill_steps(
-    low = "#132B43",
-    high = "#56B1F7",
-    space = "Lab",
-    na.value = "grey50",
-    guide = "coloursteps",
-    aesthetics = "fill",
-    name = "P-value",
-    n.breaks = 5
-  )) %>%
+  if(dim(fgseaResTidy)[1] != 0){
+    FGSEA_Results <- fgseaResTidy %>% kbl(col.names = c("Pathway", "Normalised Enrichment Score", "Size", "Adjusted p-value"), 
+                                          caption = "L363 Car-resistant cells, Top Differentially Expressed Pathways",
+                                          digits = 2,
+                                          escape = F, 
+                                          align = "c"
+    ) %>% 
+      kable_paper(html_font = "Comic Sans MS",
+                  full_width = T, bootstrap_options = c("striped", "bordered", "hover")) %>%
+      column_spec(2, color = "white", background = ifelse(fgseaResTidy$Normalised_Enrichment_Score < 0, "red", "green")) %>% footnote("Using Kable")
     
-    ggpar(#legend.title = list(color = "P-values"),
-      rotate = TRUE,
-      title = title,
-      submain = paste0(control, " vs ", test),
-      caption = paste0("GSEA with ", pathways, " gene sets from MSigDB"),
-      ggtheme = theme_pubr(),
-      #ggtheme = theme(legend.direction = "vertical"),
-      xlab = "",
-      ylab = "Normalized Enrichment Score",
-      font.title = c("bold", "brown", 18),
-      font.subtitle = c("bold", "dark grey", 14),
-      font.caption = c("bold.italic", "royal blue", 12),
-      font.legend = c("bold", "black", 6),
-      font.x = c("bold", "black", "11"),
-      #x.text.angle = 90,
-      font.y = c("bold", "black", "11"),
-      font.tickslab = c("bold", "black", "8"),
-      font.family = "Calibri",
-      
+    
+    
+    ###Plots enrichment scores
+    
+    FGSEA_plot <- (ggbarplot(fgseaResTidy,
+                             x = "Pathway",
+                             y = "Normalised_Enrichment_Score",
+                             fill = "Adjusted_p_value",
+                             #fill = "Size",
+                             #palette = "jco",
+                             sort.val = "desc",
+                             label = FALSE,
+                             xlab = FALSE,
+                             size = 1,
+                             width = 1,
     )
-  
-  FGSEA_plot
-  #ggsave(plots_dir, title, "_", pathways, "_FGSEA_plot.png")
-  GSEA_return <- list(FGSEA_Results, FGSEA_plot)
-  return(GSEA_return)
+    + scale_x_discrete(labels = function(x) str_wrap(x, 15))
+    
+    + scale_fill_steps(
+      low = "#132B43",
+      high = "#56B1F7",
+      space = "Lab",
+      na.value = "grey50",
+      guide = "coloursteps",
+      aesthetics = "fill",
+      name = "P-value",
+      n.breaks = 5
+    )) %>%
+      
+      ggpar(#legend.title = list(color = "P-values"),
+        rotate = TRUE,
+        title = title,
+        submain = paste0(control, " vs ", test),
+        caption = paste0("GSEA with ", pathways, " gene sets from MSigDB"),
+        ggtheme = theme_pubr(),
+        #ggtheme = theme(legend.direction = "vertical"),
+        xlab = "",
+        ylab = "Normalized Enrichment Score",
+        font.title = c("bold", "brown", 18),
+        font.subtitle = c("bold", "dark grey", 14),
+        font.caption = c("bold.italic", "royal blue", 12),
+        font.legend = c("bold", "black", 6),
+        font.x = c("bold", "black", "11"),
+        #x.text.angle = 90,
+        font.y = c("bold", "black", "11"),
+        font.tickslab = c("bold", "black", "8"),
+        font.family = "Calibri",
+        
+      )
+    
+    
+    #ggsave(plots_dir, title, "_", pathways, "_FGSEA_plot.png")
+    GSEA_return <- list(FGSEA_plot)
+    FGSEA_plot
+  }
+  ##kable table of results
   
 }
 
@@ -624,7 +624,7 @@ Annotate_genes_results <- function(res){
 }
 
 
-gsea_rnk <- function(results_annotated, results_dir){
+gsea_rnk <- function(results_annotated, results_dir, test="test", control="control"){
 
 gseaInput <-  results_annotated %>% 
   dplyr::filter(!is.na(ENTREZID), !is.na(log2FoldChange)) %>% 
@@ -706,7 +706,9 @@ GSEA_plots <-  function(pathways, title, results_dir, control="control", test="t
               quote=FALSE)
   
   
-  
+  if(dim(fgseaResTidy)[1] == 0){
+    return("no data")
+  }
   
   ##kable table of results
   FGSEA_Results <- fgseaResTidy %>% kbl(col.names = c("Pathway", "Normalised Enrichment Score", "Size", "Adjusted p-value"),

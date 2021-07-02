@@ -16,6 +16,8 @@ navbar:
   - text: Enrichment XGR
     icon: fa-flask
     href: XGR_Enrichment.html
+  - text: GSEA
+    href: GSEA.Rmd
 output:
   html_document:
     css: style.css
@@ -35,4 +37,3 @@ exclude:
 - expdata
 - '*.R'
 output_dir: Final_report
-

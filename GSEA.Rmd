@@ -12,6 +12,11 @@ library(fgsea)
 library(EGSEA)
 knitr::opts_chunk$set(echo = TRUE)
 design_files <- list.files(pattern = "design_")
+source('functions.R')
+library(kableExtra)
+library(stringr)
+library(dplyr)
+library(ggpubr)
 ```
 
 # GSEA rank list
@@ -21,25 +26,31 @@ for (i in design_files){
   res_name = paste("results/", i,"_annotate_res.csv", sep="")
   if(file.exists(res_name)){
     results_annotated = read.csv(res_name)
+    dir.create("results_rnk/", showWarnings = FALSE)
+    results_dir = paste("results_rnk/", i,".rnk", sep="")
+    gsea_rnk(results_annotated=results_annotated, results_dir=results_dir)
   }
 
-  dir.create("results_rnk/", showWarnings = FALSE)
-  results_dir = paste("results_rnk/", i,".rnk", sep="")
-  gsea_rnk(results_annotated=results_annotated, results_dir=results_dir)
+  
 }
 ```
 
 # GSEA run 
 
 ```{r}
+for (i in design_files){
+  
 pathways <- "Hallmark"
-title = "test"
+title = gsub(".csv","",i)
 dir.create("results_gsea/", showWarnings = FALSE)
-res_name = paste("results/", i,"_annotate_res.csv", sep="")
-res_name = "results/design_wald_DMSO_MAZ1392_compound_annotate_res.csv"
+res_name = paste("results/", title,"_annotate_res.csv", sep="")
+
 if(file.exists(res_name)){
+  print(i)
     results_dir = read.csv(res_name)
-  }
-GSEA_plots(pathways, title, results_dir)
+    print(GSEA_plots(pathways, title, results_dir))
+    }
+
+}
 
 ```
