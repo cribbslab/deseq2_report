@@ -1,0 +1,846 @@
+---
+title: "<center> BulkRNAseq Analysis of Developmental Tendon <center>"
+author: "<center> Alina Kurjan<center><br>"
+date: "<center> _`r Sys.Date()`_ <center>"
+output:
+  html_document:
+    fig_width: 15
+    fig_height: 9
+    code_folding: show
+    df_print: paged
+    theme: yeti
+    highlight: tango
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+  pdf_document:
+    fig_caption: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+library(rmarkdown)
+library(tinytex)
+library(knitr)
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, error = TRUE)
+```
+
+# Introduction
+BulkRNA-seq experiment was carried out on whole Achilles tendons from 11-13 and 15-17 week-old foetuses. 
+This reproducible and dynamic report was created using Rmarkdown and the [Knitr package](https://yihui.name/knitr/), and summarizes the basic code and outputs (plots, tables, etc). 
+
+***
+
+# R packages used
+
+A variety of R packages was used for this analysis.  All graphics and data wrangling were handled using the [tidyverse suite of packages](https://www.tidyverse.org/).  All packages used are available from the Comprehensive R Archive Network (CRAN), Bioconductor.org, or Github. Renv lockfile is available. 
+
+***
+
+# Read mapping - Aligning raw reads with Kallisto
+
+A pipeline was written and contributed to the cribbslab repository that performs automatic alignment.
+Raw reads were mapped to the human reference transcriptome using [Kallisto](https://pachterlab.github.io/kallisto/), version *X*.  The quality of raw reads, as well as the results of Kallisto mapping are summarized in [this summary report](INSERT LINK TO GITHUB) generated using [fastqc](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) and [multiqc](https://multiqc.info/).
+
+
+***
+
+# Importing Count Data into R - Reading Counts Associated with Genes
+
+After read mapping with Kallisto, [TxImport](https://bioconductor.org/packages/release/bioc/html/tximport.html) was used to read kallisto outputs into the R environment. Annotation data from EnsemblDb was used to summarize data from transcript-level to gene-level.
+
+```{r step 1 - TxImport}
+library(rhdf5)
+library(tidyverse)
+library(tximport)
+library(ensembldb)
+library(EnsDb.Hsapiens.v86)
+
+# load in the sample metadata file
+sample_table <- read_csv("studydesign.csv")
+sample_table$Sample_ID <- sub("_", "-", sub("_", "-", sample_table$Sample_ID))
+sample_table <- sample_table[1:12,] # keeping only young and middle only for this
+
+# set base/control level to Young (11-13wk samples)
+sample_table$Group <- factor(sample_table$Group, levels = c("young", "middle"))
+
+# set directory path to your kallisto_output files
+kallisto_dir <- "/Users/akurjan/Documents/Pipelines/bulkRNAseq/pseudoalignment/quant"
+# set path to abundance.h5 files within kallisto output folders
+path <- file.path(kallisto_dir, sample_table$Sample_ID, "abundance.h5")
+# check if path works - all(file.exists(path))
+# add path column to the sample_table (studydesign)
+sample_table <- dplyr::mutate(sample_table, path = path)
+
+# create the tx2gene file that will contain transcript and corresponding gene IDs and names
+Tx <- transcripts(EnsDb.Hsapiens.v86, columns=c("tx_id", "gene_id", "symbol"))
+Tx <- as_tibble(Tx)
+Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
+
+# import Kallisto transcript counts into R using Tximport
+Txi_gene <- tximport(path, 
+                     type = "kallisto", 
+                     tx2gene = Tx, 
+                     txOut = FALSE, # TRUE outputs transcripts, FALSE outputs gene-level data
+                     countsFromAbundance = "lengthScaledTPM",
+                     ignoreTxVersion = TRUE)
+
+# Write the counts to an object (used for metadata and clustering)
+data <- Txi_gene$counts %>% 
+  round() %>% 
+  data.frame()
+```
+
+***
+
+# Creating the DESeqDataSet Object
+
+Preprocessing: need to make sure things are in the right format and design formula is specified correctly. Following dds object creation, we pre-filter the dataset to remove rows with 0 counts - this speeds up the downstream processes.
+
+```{r step 2 - Create Differential Expression DataSet Object}
+library(DESeq2)
+
+# set rownames to match sample names
+rownames(sample_table) <- sample_table$Sample_Name
+
+# create a variable containing study design formula
+design <- ~ Group
+
+# Create a DESeqDataSet object named dds
+dds <- DESeqDataSetFromTximport(Txi_gene,
+                                colData = sample_table,
+                                design = design)
+
+# Filtering: keep samples that have a count of higher than 1
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+```
+
+***
+
+# Exploratory analysis and visualization
+
+## Transforming count data for QC
+First, we transform the counts using Rlog or VST to visually explore sample relationships. NB: transformed counts cannot be used for DE statistical tests!
+
+Performing PCA directly on a matrix of counts or normalized counts (corrected for differences in sequencing depth, e.g. by DESeq) will give a skewed plot that favours genes with highest counts because they show the largest absolute differences between the samples. 
+
+DESeq2 offers two transformations for count data that stabilize the variance across the mean: the variance stabilizing transformation (VST) for negative binomial data with a dispersion-mean trend (Anders and Huber 2010), implemented in the vst function, and the regularized-logarithm transformation or rlog (Love, Huber, and Anders 2014).
+
+```{r}
+# Regularised-logarithm transformation (Rlog) - better for data with <30 samples
+rld <- rlog(dds, blind = TRUE)
+
+# Variance stabilising transformation (VST) - better for data with more samples
+vsd <- vst(dds, blind = TRUE)
+
+# Make a plot of sample-sample distances, comparison of different transformation methods
+# Calculate size factors for each sample to normalise for sequencing depth
+dds <- estimateSizeFactors(dds)
+
+# Create a dataframe to use for plotting
+df <- bind_rows(
+  as_data_frame(log2(counts(dds, normalized=TRUE)[, 1:2]+1)) %>%
+         mutate(transformation = "log2(x + 1)"),
+  as_data_frame(assay(vsd)[, 1:2]) %>% mutate(transformation = "vst"),
+  as_data_frame(assay(rld)[, 1:2]) %>% mutate(transformation = "rlog"))
+
+colnames(df)[1:2] <- c("x", "y")  
+lvls <- c("log2(x + 1)", "vst", "rlog")
+df$transformation <- factor(df$transformation, levels=lvls)
+
+# x axis - sample nr 1, y axis - sample nr 2
+ggplot(df, aes(x = x, y = y)) + geom_hex(bins = 80) +
+  coord_fixed() + facet_grid( . ~ transformation)  
+```
+
+
+## Assessing sample similarity
+
+A useful first step in an RNA-seq analysis is often to assess overall similarity between samples: Which samples are similar to each other, which are different? Does this fit to the expectation from the experiment’s design?
+
+We use the R function dist to calculate the Euclidean distance between samples. To ensure we have a roughly equal contribution from all genes, we use it on the rlog-transformed data. We need to transpose the matrix of values using t, because the dist function expects the different samples to be rows of its argument, and different dimensions (here, genes) to be columns.
+
+```{r}
+library(pheatmap)
+library(RColorBrewer)
+# Heatmap of sample-to-sample distances using the variance stabilizing transformed values (rlog).
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- paste( rld$Group, rld$Sample_Name, sep = " - " )
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         col = colors)
+```
+
+
+## Hierarchical Clustering (Rlog Transformed Counts)
+
+```{r}
+library(pheatmap)
+rld_mat <- assay(rld)
+# Compute pairwise correlation values
+rld_cor <- cor(rld_mat)
+# Plot heatmap
+anno <- as.data.frame(colData(rld)[, c("Group","Age")])
+pheatmap(rld_cor, annotation = anno)
+```
+
+## PCA plots
+ 
+Another way to visualize sample-to-sample distances is a principal components analysis (PCA). In this ordination method, the data points (here, the samples) are projected onto the 2D plane such that they spread out in the two directions that capture the most of the variance across samples. The x-axis is the direction that separates the data points the most. The coordinates of the samples in this direction are called PC1. In our PCA of samples, a direction is a linear combination of genes. For the current data, PC1 is associated with the separation between the treated and untreated samples, and so the genes that contribute the most to this direction are ones in which the treated and untreated samples show strong differences in their transformed counts. The y-axis is the direction (it must be orthogonal to the first direction) that separates the data the second most. The coordinates of the samples in this direction are written PC2. We can see in this case that the second direction is separating the samples according to the donor. The percent of the total variance that is contained in the direction is printed in the axis label. Note that these percentages do not add to 100%, because there are more directions that contain the remaining variance (although each of these remaining dimensions will explain less than the two that we see).
+
+```{r PCA Plots}
+library(glmpca)
+library(cowplot)
+# PCA plot using the rlog-transformed data
+pcarlog <- plotPCA(rld, intgroup = c("Group"), ntop = 700)
+
+# PCA plot with raw counts data
+gpca <- glmpca(counts(dds), L=2)
+gpca.dat <- gpca$factors
+gpca.dat$Group<- dds$Group
+gpca.dat <- dplyr::rename(gpca.dat, PC1 = dim1, PC2 = dim2)
+pcaraw <- ggplot(gpca.dat, aes(x = PC1, y = PC2, color = Group)) +
+  geom_point(size =3) + coord_fixed()
+
+plot_grid(pcarlog, pcaraw, labels = c('Rlog PCA', 'Generalised Raw Counts PCA'), label_size = 12)
+```
+
+```{r PCA Plots for any principal components}
+## Create a sampletable/metadata
+meta <- sample_table[,4]
+rownames(meta) <- rownames(sample_table)
+  
+# Input is a matrix of log transformed values
+rld_mat <- assay(rld)
+pca <- prcomp(t(rld_mat))
+
+# Create data frame with metadata and PC3 and PC4 values for input to ggplot
+df <- cbind(meta, pca$x)
+ggplot(df) + geom_point(aes(x=PC3, y=PC4, color = Group, size = 3)) + coord_fixed() + ggtitle("Rlog PCA")
+```
+
+***
+
+# Differential Expression Analysis
+
+## Normalised Counts for QC (DESeq2 Median of Ratios - Size Factors)
+
+Now, we will go back to the original raw counts for statistical testing. This is critical because the statistical testing methods rely on original count data (not scaled or transformed) for calculating the precision of measurements.
+
+DESeq2 does the following:
+* the estimation of size factors (controlling for differences in the sequencing depth of the samples) - done by estimateSizeFactors (dds)
+```{r}
+# RUnning dIfferential expression pipeline on raw counts
+dds <- DESeq(dds)
+
+# Checking the Size Factors and Dispersion
+plot_table <- data.frame(sample = row.names(colData(dds)), 
+                         size_factors = sizeFactors(dds), 
+                         condition = colData(dds)$Group)
+ggplot(plot_table, aes(x = sample, y = size_factors, fill = condition)) +
+    geom_col() +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+- the estimation of dispersion values for each gene - done by estimateDispersions(dds)
+```{r}
+plotDispEsts(dds)
+```
+
+- fitting a generalized linear model (models expression of each gene using a negative binomial GEM and identify differentially-expressed genes using Wald Test). Wald test: null hypothesis is that log2 Fold Change between specified conditions is equal to 0 for each gene - done by nbinomWaldTest(dds)
+```{r}
+library(DT)
+# Building the results table. results(dds) shows estimated log2 fold changes (log2FC) 
+# and pvalues for the last variable in the design formula (in this case - Middle)
+res <- results(dds, contrast=c("Group", "middle", "young"))
+
+# Adding gene names (symbol column) and ENTREZ ID to match ENSEMBL IDs in results(dds)
+ens.str <- substr(rownames(res), 1, 15)
+res$symbol <- mapIds(EnsDb.Hsapiens.v86,
+                     keys=ens.str,
+                     column="SYMBOL",
+                     keytype="GENEID",
+                     multiVals="first")
+res$entrez <- mapIds(EnsDb.Hsapiens.v86,
+                     keys=ens.str,
+                     column="ENTREZID",
+                     keytype="GENEID",
+                     multiVals="first")
+summary(res)
+```
+
+
+```{r Significant Results Table}
+# Filter results to keep DEGs with padj < 0.05
+resSignificant <- subset(res, padj < 0.05)
+
+# Make table with full results
+res.df <- as.data.frame(resSignificant)
+res.df$geneID <- rownames(res.df)
+res.df <- res.df[which(duplicated(res.df$symbol) == FALSE), ] # remove symbol duplicates
+rownames(res.df) <- res.df[,7]
+res.df[,7] <- NULL
+
+datatable(res.df, 
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Table 1: DEGs in 15-17wk old vs 11-13wk old foetal tendons (raw data)',
+          options = list(keys = TRUE, searchHighlight = TRUE, pageLength = 10, lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(1:7), digits=2)
+```
+
+
+The results for significant genes (padj < 0.05) are shown here. The table includes expression data for `r nrow(res.df)` genes. You can sort and search the data directly from the table.
+
+```{r P adjusted and P value Histograms}
+p_adj <- ggplot(res.df, aes(x=padj))+
+    geom_histogram()
+p <- ggplot(res.df, aes(x=pvalue))+
+    geom_histogram()
+plot_grid(p_adj, p, labels = c("P-adjusted", "P-value"), ncol = 2, nrow = 1)
+```
+
+
+Normalized counts for a single gene over comparison group:
+```{r Significant Gene Comparison}
+topGene <- rownames(res)[which.min(res$padj)]
+geneCounts <- plotCounts(dds, gene = topGene, intgroup = c("Group","Age"),
+                         returnData = TRUE)
+ggplot(geneCounts, aes(x = Group, y = count, color = Age)) +
+  scale_y_log10() + geom_point(size = 3) + ggtitle(topGene)
+```
+
+*These log2FC estimates do not account for the large dispersion we observe with low read counts. To avoid this, the log2 fold changes calculated by the model need to be adjusted:*
+
+## Shrinking Log2FoldChange Values (apeglm, ashr) & Creating MA-plots
+
+To generate more accurate log2 foldchange estimates, DESeq2 allows for the shrinkage of the LFC estimates toward zero when the information for a gene is low, which could include:
+
+* Low counts
+* High dispersion values
+
+```{r Shrinking DESeq Log2FC Values}
+# normal data
+res.noshr <- results(dds, name="Group_middle_vs_young")
+# shrinking applied to moderate (shrink) log2FC from genes with very low or highly variable counts
+## apeglm method
+dds_apeglm <- lfcShrink(dds, coef="Group_middle_vs_young", type="apeglm")
+## ashr method:
+dds_ashr <- lfcShrink(dds, contrast = c("Group", "middle", "young"), type = "ashr")
+```
+
+An MA-plot of changes induced by development. The log2 fold change for a particular comparison is plotted on the y-axis and the average of the counts normalized by size factor is shown on the x-axis. Each gene is represented with a dot. Genes with an adjusted p value below a threshold (here 0.1, the default) are shown in blue. The more to the right something is, the more highly expressed it is.
+
+We should ideally see significant genes (blue) across the full range of expression levels
+```{r MA Plots}
+plotMA(res.noshr, ylim = c(-5, 5))
+with(res[topGene, ], {
+  points(baseMean, log2FoldChange, col="black", cex=2, lwd=2)
+  text(baseMean, log2FoldChange, topGene, pos=1, col="black")
+})
+
+plotMA(dds_apeglm, ylim = c(-5, 5))
+
+plotMA(dds_ashr, ylim = c(-5, 5))
+```
+
+
+## DEGs Table after shrinkage with apeglm method
+
+```{r Table of Upregulated and Downregulated DEGs}
+# First, add in gene symbols to simplify interpretation:
+# create a dataframe
+dds_apeglm_df <- as.data.frame(dds_apeglm)
+# Remove all genes with a padj of NA (! = is NOT)
+dds_apeglm_df <- dds_apeglm_df %>%
+    dplyr::filter(!is.na(padj))
+# make the map of ENSEMBL IDs and symbols
+symbol <- mapIds(EnsDb.Hsapiens.v86, 
+               keys = rownames(dds_apeglm_df), 
+               column="SYMBOL",
+               keytype="GENEID",
+               multiVals="first")
+# make this into a dataframe
+dds_apeglm_df_GeneID <- as.data.frame(symbol)
+# make a new column with Gene IDs for both the Gene file and the dds_apeglm_df file.
+dds_apeglm_df_GeneID$ENSEMBL_ID <- row.names(dds_apeglm_df_GeneID)
+dds_apeglm_df$ENSEMBL_ID <- row.names(dds_apeglm_df)
+# merge the two files together into one
+dds_apeglm_df <- left_join(dds_apeglm_df_GeneID, dds_apeglm_df, by = "ENSEMBL_ID")
+# remove symbol duplicates
+dds_apeglm_df <- dds_apeglm_df[which(duplicated(dds_apeglm_df$symbol) == FALSE), ]
+# make gene symbols into rownames, reorder columns to match previous table
+rownames(dds_apeglm_df) <- dds_apeglm_df[,1]
+dds_apeglm_df[,1] <- NULL
+dds_apeglm_df <- dds_apeglm_df[,c(2:6,1)]
+
+# Next, filter the data:
+# select only genes upregulated in Middle vs Young (fold change threshold of 1.5):
+upregulated <- dds_apeglm_df %>%
+  dplyr::filter(padj < 0.05 & log2FoldChange >= 1)
+
+upregulated_tb <- upregulated %>%
+  data.frame() %>%
+  dplyr::rename(gene = ENSEMBL_ID) %>% 
+  as_tibble()
+
+# select only genes downregulated in Middle vs Young (fold change threshold of 1.5):
+downregulated <- dds_apeglm_df %>%
+  dplyr::filter(padj < 0.05 & log2FoldChange <= -1)
+downregulated_tb <- downregulated %>%
+  data.frame() %>%
+  dplyr::rename(gene = ENSEMBL_ID) %>% 
+  as_tibble()
+
+# Finally, make the table
+datatable(upregulated, 
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Table 2: Upregulated DEGs in 15-17wk old vs 11-13wk old foetal tendons (APEGLM Shrunk Data)',
+          options = list(keys = TRUE, searchHighlight = TRUE, pageLength = 10, lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(1:5), digits=2)
+```
+
+```{r}
+datatable(downregulated, 
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Table 3: Downregulated DEGs in 15-17wk old vs 11-13wk old foetal tendons (APEGLM Shrunk Data)',
+          options = list(keys = TRUE, searchHighlight = TRUE, pageLength = 10, lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(1:5), digits=2)
+```
+
+## Clustering a subset of the most highly variable genes
+
+```{r}
+# Use dds normalised counts (not suitable for actual DEG work)
+middle_meta <- meta %>% 
+              rownames_to_column(var="samplename") %>% 
+              as_tibble()
+txannot <- Tx %>% 
+          dplyr::select(ens_gene, ext_gene) %>% 
+          dplyr::distinct()
+normalized_counts <- counts(dds, normalized = TRUE) %>% 
+                     data.frame(check.names = FALSE) %>%
+                     rownames_to_column(var="gene") %>%
+                     as_tibble() %>%
+                     left_join(txannot, by = c("gene" = "ens_gene"))
+middle_sig <- normalized_counts[,c(8:13,2:7)] %>%
+              data.frame(row.names = normalized_counts$gene, check.names = FALSE) %>% 
+              dplyr::filter(normalized_counts$gene %in% upregulated_tb$gene)
+young_sig <- normalized_counts[,c(8:13,2:7)] %>%
+              data.frame(row.names = normalized_counts$gene, check.names = FALSE) %>% 
+              dplyr::filter(normalized_counts$gene %in% downregulated_tb$gene)
+
+### Set a color palette
+heat_colors <- brewer.pal(9, "YlOrRd")
+
+### Run pheatmap using the metadata data frame for the annotation
+pheatmap(middle_sig[1:12], 
+    color = heat_colors,
+    cluster_rows = T, 
+    show_rownames = F, 
+    fontsize = 10, 
+    scale = "row", 
+    fontsize_row = 10, 
+    height = 20,
+    annotation_col = anno,
+    annotation_colors = )
+```
+
+
+### Interactive heatmaps:
+15-17wk vs 11-13wk Tendons:
+```{r}
+library(heatmaply)
+clustRows <- hclust(as.dist(1-cor(t(middle_sig), method="pearson")), method="complete") 
+heatmaply(middle_sig,
+          colors = heat_colors,
+          Rowv=as.dendrogram(clustRows),
+          showticklabels=c(TRUE,FALSE),
+          scale='row')
+```
+
+
+11-13wk vs 15-17wk Tendons:
+```{r}
+cool_colors <- brewer.pal(9, "Purples")
+clustRowsYoung <- hclust(as.dist(1-cor(t(young_sig), method="pearson")), method="complete") 
+heatmaply(young_sig,
+          colors = cool_colors,
+          Rowv=as.dendrogram(clustRowsYoung),
+          showticklabels=c(TRUE,FALSE),
+          scale='row')
+```
+
+
+## Volcano Plots
+APEGLM Shrunk Data
+Significant if padj <0.05 AND/OR log2FC > +/- 1
+```{r}
+library(EnhancedVolcano)
+EnhancedVolcano(dds_apeglm_df,
+    lab = rownames(dds_apeglm_df),
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    title = '11-13wk versus 15-17wk Tendons',
+    pCutoff = 10e-6,
+    FCcutoff = 1,
+    pointSize = 2.0,
+    labSize = 6.0,
+    col=c('black', 'gray', 'lightblue', 'red3'),
+    colAlpha = 1)
+```
+
+```{r}
+# In new columnn, obtain logical vector where TRUE values denote padj values < 0.05 and fold change > 1.5 in either direction
+dds_apeglm_df_sig <- dds_apeglm_df %>% 
+                  mutate(threshold_OE = padj < 0.05 & abs(log2FoldChange) >= 1)
+
+## Add all the gene symbols as a column from the grch38 table using bind_cols()
+dds_apeglm_df_sig <- dds_apeglm_df_sig %>%
+                     rownames_to_column(var="genename")
+
+## Create an empty column to indicate which genes to label
+dds_apeglm_df_sig <- dds_apeglm_df_sig %>% mutate(genelabels = "")
+
+## Sort by padj values 
+dds_apeglm_df_sig <- dds_apeglm_df_sig %>% arrange(padj)
+
+## Populate the genelabels column with contents of the gene symbols column for the first 10 rows, i.e. the top 10 most significantly expressed genes
+dds_apeglm_df_sig$genelabels[1:10] <- as.character(dds_apeglm_df_sig$genename[1:10])
+
+
+# Create a volcano plot with ggplot
+ggplot(dds_apeglm_df_sig, aes(x = log2FoldChange, y = -log10(padj))) +
+    geom_point(aes(colour = threshold_OE)) +
+    geom_text_repel(aes(label = genelabels)) +
+    ggtitle("15-17wk vs 11-13wk Tendons") +
+    xlab("log2 fold change") + 
+    ylab("-log10 adjusted p-value") +
+    theme(legend.position = "none",
+          plot.title = element_text(size = rel(1.5), hjust = 0.5),
+          axis.title = element_text(size = rel(1.25)))  
+```
+
+***
+
+# Gene Set and Pathway Analysis
+
+## Gene Set Enrichment Analysis of Gene Ontology
+
+### gProfiler2 - Interactive Manhattan Plot
+```{r Manhattan Plot}
+library(gprofiler2)
+# Sorting by Log2FC value
+upregulated <- upregulated[order(upregulated$log2FoldChange, decreasing = TRUE),]
+upregulated_gprof <- upregulated
+upregulated_gprof$symbol <- NULL
+rownames(upregulated_gprof) <- NULL
+downregulated <- downregulated[order(downregulated$log2FoldChange, decreasing = FALSE),]
+dds_apeglm_df <- dds_apeglm_df[order(dds_apeglm_df$log2FoldChange, decreasing = TRUE),]
+
+# take top50 upregulated genes
+topGenes <- upregulated_gprof[1:50,]
+# use the 'gost' function from the gprofiler2 package to run GO enrichment analysis
+gost.res <- gost(rownames(topGenes), organism = "hsapiens", correction_method = "fdr")
+# produce an interactive manhattan plot of enriched GO terms
+gostplot(gost.res, interactive = TRUE, capped = TRUE) #set interactive=FALSE to get plot for publications
+```
+
+
+### Cluster Profiler - gseGO (uses Org.XX.eg.db species library as reference)
+
+```{r ClusterProfiler - gseGO}
+library(org.Hs.eg.db)
+library(clusterProfiler)
+# create a vector with just log2FoldChange values and gene names
+upregulated_gene_list <- upregulated$log2FoldChange
+# give name to each value in the vector
+names(upregulated_gene_list) <- upregulated$ENSEMBL_ID
+gse <- gseGO(geneList=upregulated_gene_list, 
+             ont ="ALL", 
+             keyType = "ENSEMBL",
+             minGSSize = 3,
+             maxGSSize = 800, 
+             nPermSimple = 100000,
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = org.Hs.eg.db, 
+             pAdjustMethod = "none")
+
+gse_results <- gse@result
+
+## gseaplot(gse, by = "all", title = gse$Description[1], geneSetID = 1)
+
+# make an interactive, searchable table:
+datatable(gse_results[,1:10], 
+          extensions = c('KeyTable', "FixedHeader"), 
+          rownames = FALSE,
+          caption = 'Table 4: Signatures enriched in 15-17wk old Tendons',
+          options = list(keys = TRUE, 
+                         searchHighlight = TRUE, 
+                         pageLength = 10, 
+                         lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(5:8), digits=4)
+```
+
+
+Bubble Plot - Activated vs Suppressed
+```{r Bubble Plot gseGO}
+dotplot(gse, showCategory=10, split=".sign") + facet_grid(.~.sign)
+# GeneRatio - percentage of overexpressed genes compared to the given ontology term.
+# GeneRatio = Count/Gene set
+```
+
+### Cluster Profiler - GSEA (uses msigdbr species library as reference)
+
+All APEGLM Shrunk Data:
+```{r}
+library(msigdbr)
+# check species name using msigdbr_species()
+hs_gsea <- msigdbr(species = "Homo sapiens") #gets all collections/signatures with human gene IDs
+#take a look at the categories and subcategories of signatures available to you
+hs_gsea %>% 
+  dplyr::distinct(gs_cat, gs_subcat) %>% 
+  dplyr::arrange(gs_cat, gs_subcat)
+
+# ONTOLOGY
+hs_gsea_c5 <- msigdbr(species = "Homo sapiens", # change depending on species your data came from
+                      category = "C5") %>% # choose your msigdb collection of interest
+      dplyr::select(gs_name, gene_symbol) #just get the columns corresponding to signature name and gene symbols of genes in each signature 
+
+# IMMUNE SIGNATURES
+hs_gsea_c7 <- msigdbr(species = "Homo sapiens",
+                      category = "C7") %>% 
+      dplyr::select(gs_name, gene_symbol)
+
+# CELL TYPES
+hs_gsea_c8 <- msigdbr(species = "Homo sapiens",
+                      category = "C8") %>% 
+      dplyr::select(gs_name, gene_symbol)
+
+dds_apeglm_df <- dds_apeglm_df %>%
+                 rownames_to_column(var="symbol")
+
+mydata.df.sub <- dplyr::select(dds_apeglm_df, symbol, log2FoldChange)
+mydata.gsea <- mydata.df.sub$log2FoldChange
+names(mydata.gsea) <- as.character(mydata.df.sub$symbol)
+mydata.gsea <- sort(mydata.gsea, decreasing = TRUE)
+myGSEA.res <- GSEA(mydata.gsea, TERM2GENE=hs_gsea_c8, verbose=FALSE)
+myGSEA.df <- as_tibble(myGSEA.res@result)
+myGSEA.df <- myGSEA.df[,2:8]
+
+# make an interactive, searchable table:
+datatable(myGSEA.df, 
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Table 5: Signatures enriched in Foetal Tendons',
+          options = list(keys = TRUE, 
+                         searchHighlight = TRUE, 
+                         pageLength = 10, 
+                         lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(3:7), digits=4)
+```
+
+GSEA performed on `r nrow(myGSEA.df)` genes.
+
+
+#### GSEA Enrichment Plots for Individual Gene Sets
+
+```{r}
+# Use the `Gene Set` param for the index in the title, and as the value for geneSetId
+gseaplot(myGSEA.res, by = "all", title = myGSEA.res$Description[2], geneSetID = 2)
+```
+
+```{r}
+library(enrichplot)
+# create enrichment plots using the enrichplot package
+gseaplot2(myGSEA.res, 
+          geneSetID = c(1, 2, 3), #can choose multiple signatures to overlay in this plot
+          pvalue_table = FALSE)
+```
+
+#### GSEA Bubble plots for Signatures Across Phenotypes
+
+```{r}
+# add a variable to this result that matches enrichment direction with phenotype
+myGSEA.df <- myGSEA.df %>%
+  mutate(phenotype = case_when(
+    NES > 0 ~ "15-17wk",
+    NES < 0 ~ "11-13wk"))
+
+# create 'bubble plot' to summarize y signatures across x phenotypes
+ggplot(myGSEA.df[1:20,], aes(x=phenotype, y=Description)) + 
+  geom_point(aes(size=setSize, color = NES, alpha=-log10(p.adjust))) +
+  scale_color_gradient(low="blue", high="red") +
+  theme_bw()
+```
+
+```{r}
+dotplot(myGSEA.res, showCategory=10, split=".sign") + facet_grid(.~.sign)
+```
+
+
+## Enrichment Analysis - enrichGO
+
+```{r}
+upregulated <- dds_apeglm_df %>%
+  dplyr::filter(padj < 0.05)
+
+upregulated_geneID <- upregulated$ENSEMBL_ID
+dds_apeglm_df_geneID <- dds_apeglm_df$ENSEMBL_ID
+
+ego <- enrichGO(gene = upregulated_geneID, 
+                universe = dds_apeglm_df_geneID,
+                keyType = "ENSEMBL",
+                OrgDb = org.Hs.eg.db, 
+                ont = "BP", 
+                pAdjustMethod = "BH", 
+                qvalueCutoff = 0.05, 
+                readable = TRUE)
+
+## Output results from GO analysis to a table
+cluster_summary <- data.frame(ego)
+
+datatable(cluster_summary[,1:7],
+          rownames = FALSE,
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Table 6: Signatures enriched in 15-17wk old Tendons',
+          options = list(keys = TRUE, 
+                         searchHighlight = TRUE, 
+                         pageLength = 10, 
+                         lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(5:7), digits=4)
+```
+
+Carried out on `r length(upregulated_geneID)` genes that are significant (padj < 0.05).
+
+```{r}
+dotplot(ego)
+```
+
+#### Enrichment Maps
+
+```{r}
+x2 <- pairwise_termsim(ego)
+emapplot(x2)
+```
+
+#### Category Netplots - gseGO vs enrichGO outputs
+The category netplot shows the relationships between the genes associated with the top five most significant GO terms and the fold changes of the significant genes associated with these terms (color). The size of the GO terms reflects the pvalues of the terms, with the more significant terms being larger.
+
+```{r}
+# categorySize can be either 'pvalue' or 'geneNum'
+cnetplot(gse, categorySize="pvalue", foldChange=upregulated_gene_list, showCategory = 3)
+```
+
+```{r}
+cnetplot(ego, 
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=upregulated_gene_list, 
+         vertex.label.font=3)
+```
+
+
+For specific GO categories:
+```{r}
+ego2 <- ego
+ego2@result <- ego@result[c(1,2,3),]
+cnetplot(ego2, 
+         categorySize="pvalue", 
+         foldChange=upregulated_gene_list, 
+         showCategory = 5, 
+         vertex.label.font=6)
+```
+
+## KEGG Pathway Enrichment Analysis - gseKEGG
+
+```{r}
+# Convert gene IDs for gseKEGG function
+# Will lose some genes here because not all IDs will be converted
+ids <- bitr(names(upregulated_gene_list), fromType = "ENSEMBL", toType = "ENTREZID", OrgDb= org.Hs.eg.db)
+# remove duplicate IDS (here I use "ENSEMBL", but it should be whatever was selected as keyType)
+dedup_ids = ids[!duplicated(ids[c("ENSEMBL")]),]
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = upregulated[upregulated$ENSEMBL_ID %in% dedup_ids$ENSEMBL,]
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$entrez = dedup_ids$ENTREZID
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$log2FoldChange
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$entrez
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+
+gseaKEGG <- gseKEGG(geneList = kegg_gene_list,
+               organism = "hsa",
+               nPerm = 10000,
+               minGSSize = 3,
+               pvalueCutoff = 0.05,
+               verbose = FALSE,
+               pAdjustMethod = "none",
+               keyType = "kegg")
+
+## Extract the GSEA results
+gseaKEGG_results <- gseaKEGG@result
+
+datatable(gseaKEGG_results[,1:9], 
+          rownames = FALSE,
+          extensions = c('KeyTable', "FixedHeader"), 
+          caption = 'Signatures enriched in 15-17wk old Tendons',
+          options = list(keys = TRUE, 
+                         searchHighlight = TRUE, 
+                         pageLength = 10, 
+                         lengthMenu = c("10", "25", "50", "100"))) %>%
+  formatRound(columns=c(4:7), digits=4)
+```
+
+#### GSEA KEGG Plot
+
+```{r}
+# Params: Gene Set Integer. Corresponds to gene set in the gse object. The first gene set is 1, second gene set is 2, etc. Default: 1
+gseaplot(gseaKEGG, by = "all", title = gseaKEGG$Description[1], geneSetID = 1)
+```
+
+#### GSEA KEGG Dotplot
+
+```{r}
+dotplot(gseaKEGG, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+```
+
+## Pathview
+
+Params: - gene.data This is kegg_gene_list created above - pathway.id The user needs to enter this. Enriched pathways + the pathway ID are provided in the gseKEGG output table (above). - species Same as organism above in gseKEGG, which we defined as kegg_organism
+
+```{r Pathview, eval = FALSE}
+library(pathview)
+## Output images for a single significant KEGG pathway
+## In case of conflict with dplyr: detach("package:dplyr", unload=TRUE)
+
+pathview(gene.data = kegg_gene_list,
+              pathway.id = gseaKEGG_results$ID[1],
+              species = "hsa",
+              limit = list(gene = 7, # value gives the max/min limit for foldchanges
+              cpd = 1))
+```
+
+```{r, eval = TRUE, echo = TRUE}
+knitr::include_graphics("hsa04260.pathview.png")
+knitr::include_graphics("hsa00564.pathview.png")
+knitr::include_graphics("hsa04610.pathview.png")
+knitr::include_graphics("hsa04080.pathview.png")
+```
+
+
+# Session Info
+```{r}
+sessionInfo()
+```
+
