@@ -27,7 +27,7 @@ We define the term quality as fitness for purpose. Our purpose is the detection 
 In this page, you will see all of the analysis performed to understand which samples are potentially going to negatively impact the downstream analysis.
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(cache=TRUE)
+knitr::opts_chunk$set(cache=FALSE)
 source('functions.R')
 library(org.Hs.eg.db)
 library(DESeq2)
