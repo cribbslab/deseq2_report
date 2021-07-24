@@ -24,13 +24,87 @@ library(RColorBrewer)
 library(pheatmap)
 library(PCAtools)
 library(ggpubr)
+library(yaml)
+library(rhdf5)
+library(tximport)
+library(ensembldb)
+library(EnsDb.Hsapiens.v86)
+library(EnsDb.Mmusculus.v79)
+```
+
+```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+params <- read_yaml("config.yml")
 ```
 
 
 ```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
-design_files <- list.files(pattern = "design_")
+if(params$kallisto){
+  print("kallisto input detected")
+  
+  design_files <- list.files(path='designs_kallisto/', pattern = "design_")
+  
+  # load in the sample metadata file
+  sample_table <- read.csv("kallisto_input.csv")
+  
+  if (dir.exists(params$kallisto_dir)) {
+    path <- file.path(params$kallisto_dir, sample_table$Sample, "abundance.h5")
+    sample_table <- dplyr::mutate(sample_table, path = path)
+  
+  if(params$species == "human"){
+    # Create the tx2gene file that will map transcripts to genes
+    Tx <- transcripts(EnsDb.Hsapiens.v86, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
+    
+  }else{
+    Tx <- transcripts(EnsDb.Mmusculus.v79, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")  
+  }
+    
+    # import Kallisto transcript counts into R using Tximport
+    Txi_gene <- tximport(path, 
+                     type = "kallisto", 
+                     tx2gene = Tx, 
+                     txOut = FALSE, # TRUE outputs transcripts, FALSE outputs gene-level data
+                     countsFromAbundance = "lengthScaledTPM",
+                     ignoreTxVersion = TRUE)
+    # Write the counts to an object (used for metadata and clustering)
+    df_mRNA <- Txi_gene$counts %>% 
+            round() %>% 
+            data.frame()
+    colnames(df_mRNA) <- sample_table$Sample
+    
+    meta_data <- sample_table
+    rownames(meta_data) <- meta_data$Sample
+    
+  if (file.exists(paste0('designs_kallisto/',design_files[1]))) {
+    for (i in design_files){
+    meta_data <- read.table(paste0('designs_kallisto/',i), sep=",", header = TRUE) 
+    rownames(meta_data) <- meta_data$Sample
+    df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+    all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
+    assign(paste("meta_data", i, sep = "."), meta_data)}
 
+      
+} else {
+    print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
+}
+    
+  } else {
+  print("Please add path to the kallisto dir in the config.yml file as it seems to be missing")
+}
+
+  
+  
+  
+}else{
+
+
+design_files <- list.files(path='designs_featurecounts/', pattern = "design_")
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
   colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
@@ -39,29 +113,45 @@ if (file.exists("featurecounts.tsv.gz")) {
 }
 
 
-if (file.exists(design_files[1])) {
+if (file.exists(paste0('designs_featurecounts/',design_files[1]))) {
   for (i in design_files){
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- read.table(paste0('designs_featurecounts/',i), sep=",", header = TRUE) 
+  rownames(meta_data) <- meta_data$Sample
+  df_mRNA = df_mRNA[,rownames(meta_data)]
+  all(rownames(meta_data) %in% colnames(df_mRNA))
   assign(paste("meta_data", i, sep = "."), meta_data)
   }
 } else {
     print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
 }
 
+}
 
 ```
 
+
+
 ```{r , include=FALSE}
 
-for (i in design_files) {
-  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
-  rownames(meta_data) <- meta_data$Sample
-  df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
-  all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
-  model <- as.character(meta_data$model[[1]])
-  dds <- run_deseq2_full(df_mRNA_tmp, meta_data, model)
-  assign(paste("dds_full", i, sep = "."), dds)
-
+if(params$kallisto){
+  for (i in design_files) {
+    meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+    rownames(meta_data) <- meta_data$Sample
+    df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+    all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
+    model <- as.character(meta_data$model[[1]])
+    dds <- run_deseq2_full(df_mRNA_tmp, meta_data, model)
+    assign(paste("dds_full", i, sep = "."), dds)
+  }
+  }else{
+  for (i in design_files) {
+    meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+    rownames(meta_data) <- meta_data$Sample
+    df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+    all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
+    model <- as.character(meta_data$model[[1]])
+    dds <- run_deseq2_full(df_mRNA_tmp, meta_data, model)
+    assign(paste("dds_full", i, sep = "."), dds)}
 }
 ```
 
@@ -73,7 +163,7 @@ To explore a count matrix, it is often instructive to look at it as a heatmap. B
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
   select <- order(rowMeans(counts(dds, normalized=TRUE)), decreasing=TRUE)[1:200]
   data = colData(dds)[,3]
@@ -100,7 +190,7 @@ A heatmap of this distance matrix gives us an overview over similarities and dis
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
   sampleDists <- dist(t(assay(vsd)))
   samplDistMatrix <- as.matrix(sampleDists)
@@ -124,7 +214,7 @@ for (i in design_files) {
 ```{r, include=FALSE}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   name <-  gsub(".csv","",i)
   pca_plot <- pca(vsd = vsd)
   assign(paste("pca_plot", i, sep = "."), pca_plot)
@@ -141,7 +231,7 @@ Related to the distance matrix is the PCA plot, which shows the samples in the 2
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
   pca_plot <- get(gsub("SAMPLE_FILE",i , "pca_plot.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   name <-  gsub(".csv","",i)
   cat("## ",name,"\n")
   print(pca_biplot(pca_plot,vsd,
@@ -156,9 +246,17 @@ for (i in design_files) {
 # PCA Loadings of the samples {.tabset .tabset-fade}
 
 ```{r}
-Plot_pca_loadings(vsd = vsd,
+for (i in design_files) {
+  vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
+  pca_plot <- get(gsub("SAMPLE_FILE",i , "pca_plot.SAMPLE_FILE"))
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+  name <-  gsub(".csv","",i)
+  cat("## ",name,"\n")
+  print(Plot_pca_loadings(vsd = vsd,
                   nPCs = 6,
                   gene_prop = 1,
-                  title = "Plot_title")
+                  title = "Plot_title"))
+  cat('\n\n')
+}
 
 ```

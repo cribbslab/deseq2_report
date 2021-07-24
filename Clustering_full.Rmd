@@ -50,7 +50,7 @@ params <- read_yaml("config.yml")
 
 
 ```{r import , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
-design_files <- list.files(pattern = "full.csv")
+
 if(params$kallisto){
   print("kallisto input detected")
   
@@ -58,7 +58,7 @@ if(params$kallisto){
   sample_table <- read.csv("kallisto_input.csv")
   
   if (dir.exists(params$kallisto_dir)) {
-    path <- file.path(params$kallisto_dir, sample_table$SampleID, "abundance.h5")
+    path <- file.path(params$kallisto_dir, sample_table$Sample, "abundance.h5")
     sample_table <- dplyr::mutate(sample_table, path = path)
   
   if(params$species == "human"){
@@ -86,10 +86,10 @@ if(params$kallisto){
     df_mRNA <- Txi_gene$counts %>% 
             round() %>% 
             data.frame()
-    colnames(df_mRNA) <- sample_table$SampleID
+    colnames(df_mRNA) <- sample_table$Sample
     
     meta_data <- sample_table
-    rownames(meta_data) <- meta_data$SampleID
+    rownames(meta_data) <- meta_data$Sample
     assign(paste("meta_data", design_files, sep = "."), meta_data)
     
   } else {
@@ -102,7 +102,7 @@ if(params$kallisto){
 }else{
 
 
-
+design_files <- list.files(pattern = "full.csv")
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
   colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
