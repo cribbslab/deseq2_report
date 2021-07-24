@@ -21,22 +21,28 @@ setClass(Class="filter_genes_return",
          )
 )
 
-filter_genes <- function(result, name){
+filter_genes <- function(result, name, species='human'){
   
   test <- as.data.frame(result)
   
   data <- as.vector(rownames(test))
-  annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
-                   columns=c("SYMBOL","GENENAME"), keytype = "ENSEMBL")
   
+  if(species == 'human'){
+    annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }else{
+    annots <-  AnnotationDbi::select(org.Mm.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }
+
   result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
   res <- result %>% 
-    dplyr::select(log2FoldChange, SYMBOL, GENENAME, baseMean, padj, Row.names) %>% 
+    dplyr::select(log2FoldChange, SYMBOL, baseMean, padj, Row.names) %>% 
     na.omit()
   
   sig <- res %>% 
-    filter(log2FoldChange > 1 | log2FoldChange < -1) %>% 
-    filter(padj < 0.05)
+    dplyr::filter(log2FoldChange > 1 | log2FoldChange < -1) %>% 
+    dplyr::filter(padj < 0.05)
   dir.create(file.path("results"), showWarnings = FALSE)
   sig_name = paste("results/", name,"_sig.csv", sep="")
   sig_name_tsv = paste("results/", name,"_sig.tsv", sep="")
@@ -159,14 +165,19 @@ run_deseq2_lrt <- function(df_mRNA, meta_data, control="untreated", test="treate
 
 
 
-plot_volcano <- function(res){
+plot_volcano <- function(res, species="human"){
   
   test <- as.data.frame(res)
   
   data <- as.vector(rownames(test))
+  
+  if(species == 'human'){
   annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
                                    columns="SYMBOL", keytype = "ENSEMBL")
-  
+  }else{
+  annots <-  AnnotationDbi::select(org.Mm.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }
   result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
   res <- result %>% 
     dplyr::select(log2FoldChange, SYMBOL, baseMean, padj, Row.names) %>% 
@@ -602,7 +613,7 @@ GSEA_plots <-  function(pathways, title, results_dir){
 
 Annotate_genes_results <- function(res){
   
-  
+  if(species=='human'){
   res$GENENAME <- mapIds(org.Hs.eg.db,
                          keys=row.names(res),
                          column="GENENAME",
@@ -621,7 +632,29 @@ Annotate_genes_results <- function(res){
                          keytype="ENSEMBL",
                          multiVals="first")
   return(res)
-}
+  }else{}
+  res$GENENAME <- mapIds(org.Mm.eg.db,
+                         keys=row.names(res),
+                         column="GENENAME",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+  res$SYMBOL <- mapIds(org.Mm.eg.db,
+                       keys=row.names(res),
+                       column="SYMBOL",
+                       keytype="ENSEMBL",
+                       multiVals="first")
+  
+  res$ENTREZID <- mapIds(org.Mm.eg.db,
+                         #EnsDb.Hsapiens.v86,
+                         keys=row.names(res),
+                         column="ENTREZID",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+  return(res)
+  
+  
+  
+  }
 
 
 gsea_rnk <- function(results_annotated, results_dir, test="test", control="control"){

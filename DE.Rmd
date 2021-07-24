@@ -13,6 +13,7 @@ To run the Rmarkdown please save your data as
 ```{r, include=FALSE}
 source('functions.R')
 library(org.Hs.eg.db)
+library(org.Mm.eg.db)
 library(DESeq2)
 library(pheatmap)
 library(tidyverse)
@@ -22,15 +23,90 @@ library(knitr)
 library(kableExtra)
 library("ggplot2") #Best plots
 library("ggrepel") #Avoid overlapping labels
+library(yaml)
+library(rhdf5)
+library(tximport)
+library(ensembldb)
+library(EnsDb.Hsapiens.v86)
+library(EnsDb.Mmusculus.v79)
 
 knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
 ```
 
+```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+params <- read_yaml("config.yml")
+```
 
-```{r}
 
-design_files <- list.files(pattern = "design_")
 
+```{r input, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+
+if(params$kallisto){
+  print("kallisto input detected")
+  
+  design_files <- list.files(path='designs_kallisto/', pattern = "design_")
+  
+  # load in the sample metadata file
+  sample_table <- read.csv("kallisto_input.csv")
+  
+  if (dir.exists(params$kallisto_dir)) {
+    path <- file.path(params$kallisto_dir, sample_table$Sample, "abundance.h5")
+    sample_table <- dplyr::mutate(sample_table, path = path)
+  
+  if(params$species == "human"){
+    # Create the tx2gene file that will map transcripts to genes
+    Tx <- transcripts(EnsDb.Hsapiens.v86, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
+    
+  }else{
+    Tx <- transcripts(EnsDb.Mmusculus.v79, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")  
+  }
+    
+    # import Kallisto transcript counts into R using Tximport
+    Txi_gene <- tximport(path, 
+                     type = "kallisto", 
+                     tx2gene = Tx, 
+                     txOut = FALSE, # TRUE outputs transcripts, FALSE outputs gene-level data
+                     countsFromAbundance = "lengthScaledTPM",
+                     ignoreTxVersion = TRUE)
+    # Write the counts to an object (used for metadata and clustering)
+    df_mRNA <- Txi_gene$counts %>% 
+            round() %>% 
+            data.frame()
+    colnames(df_mRNA) <- sample_table$Sample
+    
+    meta_data <- sample_table
+    rownames(meta_data) <- meta_data$Sample
+    
+  if (file.exists(paste0('designs_kallisto/',design_files[1]))) {
+    for (i in design_files){
+    meta_data <- read.table(paste0('designs_kallisto/',i), sep=",", header = TRUE) 
+    rownames(meta_data) <- meta_data$Sample
+    df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+    all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
+    assign(paste("meta_data", i, sep = "."), meta_data)}
+
+      
+} else {
+    print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
+}
+    
+  } else {
+  print("Please add path to the kallisto dir in the config.yml file as it seems to be missing")
+}
+
+  
+  
+  
+}else{
+
+
+design_files <- list.files(path='designs_featurecounts/', pattern = "design_")
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
   colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
@@ -39,17 +115,22 @@ if (file.exists("featurecounts.tsv.gz")) {
 }
 
 
-if (file.exists(design_files[1])) {
+if (file.exists(paste0('designs_featurecounts/',design_files[1]))) {
   for (i in design_files){
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- read.table(paste0('designs_featurecounts/',i), sep=",", header = TRUE) 
+  rownames(meta_data) <- meta_data$Sample
+  df_mRNA = df_mRNA[,rownames(meta_data)]
+  all(rownames(meta_data) %in% colnames(df_mRNA))
   assign(paste("meta_data", i, sep = "."), meta_data)
   }
 } else {
     print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
 }
 
+}
 
 ```
+
 
 ```{r}
 ## Set up the DESeq2 object
@@ -78,7 +159,6 @@ for (i in design_files) {
   assign(paste("res", i, sep = "."), res)
   assign(paste("dds", i, sep = "."), dds)
 }
-
 ```
 
 # Model fitting
@@ -115,13 +195,13 @@ for (i in design_files){
   cat("## ",name,"\n","\n")
   res <- as.data.frame(res)
   cat("Number of significant genes:","\n")
-  significance <- res %>% filter(padj < 0.05) %>% count()
+  significance <- res %>% dplyr::filter(padj < 0.05) %>% count()
   cat(significance[1,],"\n")
   cat("Number of upregulated significant genes log2 > 1:","\n")
-  significance <- res %>% filter(padj < 0.05 & log2FoldChange > 1) %>% count()
+  significance <- res %>% dplyr::filter(padj < 0.05 & log2FoldChange > 1) %>% count()
   cat(significance[1,],"\n")
   cat("Number of downregulated significant genes log2 < -1:","\n")
-  significance <- res %>% filter(padj < 0.05 & log2FoldChange < -1) %>% count()
+  significance <- res %>% dplyr::filter(padj < 0.05 & log2FoldChange < -1) %>% count()
   cat(significance[1,],"\n")
   cat('\n\n')
 
@@ -157,7 +237,7 @@ for (i in design_files){
   name <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
   cat("## ",name,"\n")
-  plt <- plot_volcano(res)
+  plt <- plot_volcano(res, species=params$species)
   print(plt)
   cat('\n\n')
 } 
@@ -182,7 +262,7 @@ legend("topright", fill=rev(colori), legend=rev(names(colori)))
 
 ## Results tables {.tabset .tabset-fade}
 
-The folowing results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
+The following results tables show the significant genes. Filtering has been performed with a log2 fold change +/- 2.
 
 
 
@@ -194,7 +274,7 @@ for (i in design_files){
   name.start <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "res.SAMPLE_FILE"))
   name <- paste0(name.start)
-  dt <- filter_genes(as.data.frame(res), name=name)
+  dt <- filter_genes(as.data.frame(res), name=name, species=params$species)
   table <- dt@sig
   new_list[[paste0("dt_",name,sep="")]] <- table
   names <- c(names, name)
@@ -205,20 +285,16 @@ df <- data.frame(cbind(new_list, classification=names))
 
 ```
 
-```{r include = FALSE}
-# Why, oh why do I need this chunk?
-datatable(df)
-```
 
-```{r results = 'asis'}
+```{r , include=FALSE, results = 'asis'}
 
-for(j in unique(df$classification)){ # You were using level() here, so your for-loop never got off the ground
-        df.j <- df[df$classification == j, ]
-        cat(paste("\n\n###", j, "\n"))
-        df_final <- as.data.frame(df.j$new_list)
-        colnames(df_final) <- c("Log2FoldChage", "Symbol", "GeneName", "baseMean", "padj", "Ensembl")
-        print( htmltools::tagList(datatable(df_final) ))
-}
+#for(j in unique(df$classification)){ # You were using level() here, so your for-loop never got off the ground
+#        df.j <- df[df$classification == j, ]
+#        cat(paste("\n\n###", j, "\n"))
+#        df_final <- as.data.frame(df.j$new_list)
+#        colnames(df_final) <- c("Log2FoldChage", "Symbol", "GeneName", "baseMean", "padj", "Ensembl")
+#        print( htmltools::tagList(datatable(df_final) ))
+#}
 ```
 
 
@@ -232,7 +308,7 @@ for (i in design_files){
   if(any(dim(res)[1] == 0)){
     
   }else{
-  rownames(res) <- res$Row.names
+  rownames(res) <- make.unique(res$Row.names)
   res_tmp <- Annotate_genes_results(res)
   sig_name = paste("results/", name.start,"_annotate_sig.csv", sep="")
   write.csv(res_tmp, sig_name)

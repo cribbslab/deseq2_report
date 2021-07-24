@@ -37,7 +37,7 @@ params <- read_yaml("config.yml")
 ```
 
 
-```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+```{r input, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
 if(params$kallisto){
   print("kallisto input detected")
@@ -131,7 +131,7 @@ if (file.exists(paste0('designs_featurecounts/',design_files[1]))) {
 
 
 
-```{r , include=FALSE}
+```{r dds, include=FALSE}
 
 if(params$kallisto){
   for (i in design_files) {
@@ -159,7 +159,7 @@ if(params$kallisto){
 
 To explore a count matrix, it is often instructive to look at it as a heatmap. Below we show how to produce such a heatmap for various transformations of the data. I have plotted a heatmap of the top 200 highly expressed genes to determine if the samples cluster together by condition.
 
-```{r , echo=FALSE}
+```{r heatmap, echo=FALSE}
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
@@ -186,7 +186,7 @@ Another use of the transformed data is sample clustering. Here, we apply the dis
 
 A heatmap of this distance matrix gives us an overview over similarities and dissimilarities between samples. We have to provide a hierarchical clustering hc to the heatmap function based on the sample distances, or else the heatmap function would calculate a clustering based on the distances between the rows/columns of the distance matrix.
 
-```{r , echo=FALSE}
+```{r distances, echo=FALSE}
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
@@ -211,7 +211,7 @@ for (i in design_files) {
 
 ```
 
-```{r, include=FALSE}
+```{r pca_generate, include=FALSE}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
@@ -227,7 +227,7 @@ for (i in design_files) {
 Related to the distance matrix is the PCA plot, which shows the samples in the 2D plane spanned by their first two principal components. This type of plot is useful for visualizing the overall effect of experimental covariates and batch effects.
 
 
-```{r , echo=FALSE, messages=FALSE}
+```{r pca, echo=FALSE, messages=FALSE}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
   pca_plot <- get(gsub("SAMPLE_FILE",i , "pca_plot.SAMPLE_FILE"))
@@ -245,7 +245,7 @@ for (i in design_files) {
 
 # PCA Loadings of the samples {.tabset .tabset-fade}
 
-```{r}
+```{r pca_loadings}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
   pca_plot <- get(gsub("SAMPLE_FILE",i , "pca_plot.SAMPLE_FILE"))
