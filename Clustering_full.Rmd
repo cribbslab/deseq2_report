@@ -2,7 +2,20 @@
 title: "Clustering"
 output: 
   html_document:
-    code_folding: hide
+    fig_width: 15
+    fig_height: 9
+    code_folding: show
+    df_print: paged
+    theme: yeti
+    highlight: tango
+    toc: yes
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    number_sections: true
+  pdf_document:
+    fig_caption: yes
+    toc: yes
 ---
 
 # Clustering of all samples
@@ -36,7 +49,7 @@ params <- read_yaml("config.yml")
 
 
 
-```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+```{r import , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 design_files <- list.files(pattern = "full.csv")
 if(params$kallisto){
   print("kallisto input detected")
@@ -77,7 +90,7 @@ if(params$kallisto){
     
     meta_data <- sample_table
     rownames(meta_data) <- meta_data$SampleID
-    assign(paste("meta_data", i, sep = "."), meta_data)
+    assign(paste("meta_data", design_files, sep = "."), meta_data)
     
   } else {
   print("Please add path to the kallisto dir in the config.yml file as it seems to be missing")
@@ -113,7 +126,7 @@ if (file.exists(design_files[1])) {
 }
 ```
 
-```{r , include=FALSE}
+```{r dds, include=FALSE}
 
 if(params$kallisto){
   for (i in design_files) {
@@ -143,7 +156,7 @@ if(params$kallisto){
 
 To explore a count matrix, it is often instructive to look at it as a heatmap. Below we show how to produce such a heatmap for various transformations of the data. I have plotted a heatmap of the top 200 highly expressed genes to determine if the samples cluster together by condition.
 
-```{r , echo=FALSE}
+```{r heatmap, echo=FALSE}
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
@@ -170,16 +183,16 @@ Another use of the transformed data is sample clustering. Here, we apply the dis
 
 A heatmap of this distance matrix gives us an overview over similarities and dissimilarities between samples. We have to provide a hierarchical clustering hc to the heatmap function based on the sample distances, or else the heatmap function would calculate a clustering based on the distances between the rows/columns of the distance matrix.
 
-```{r , echo=FALSE}
+```{r sampledist, echo=FALSE}
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
   sampleDists <- dist(t(assay(vsd)))
   samplDistMatrix <- as.matrix(sampleDists)
-  rownames(samplDistMatrix) <- meta_data[[2]]
-  colnames(samplDistMatrix) <- meta_data[[3]]
+  rownames(samplDistMatrix) <- meta_data[['compound']]
+  colnames(samplDistMatrix) <- meta_data[['Cells']]
   colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
   assign(paste("vsd", i, sep = "."), vsd)
   
@@ -202,15 +215,13 @@ Related to the distance matrix is the PCA plot, which shows the samples in the 2
 
 ## PCA - group
 
-```{r , echo=FALSE}
+```{r pca, echo=FALSE}
 for (i in design_files) {
   vsd <- get(gsub("SAMPLE_FILE",i , "vsd.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
-  one <- colnames(meta_data)[[2]]
-  two <- colnames(meta_data)[[3]]
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")
-  print(plotPCA(vsd, intgroup=c(as.character(one),as.character(two))))
+  print(plotPCA(vsd, intgroup=c(as.character('compound'),as.character('Cells'))))
   cat('\n\n')
 }
 ```
