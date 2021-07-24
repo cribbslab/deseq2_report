@@ -632,7 +632,7 @@ Annotate_genes_results <- function(res){
                          keytype="ENSEMBL",
                          multiVals="first")
   return(res)
-  }else{}
+  }else{
   res$GENENAME <- mapIds(org.Mm.eg.db,
                          keys=row.names(res),
                          column="GENENAME",
@@ -652,7 +652,7 @@ Annotate_genes_results <- function(res){
                          multiVals="first")
   return(res)
   
-  
+  }
   
   }
 

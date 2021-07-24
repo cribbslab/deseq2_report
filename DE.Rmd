@@ -301,7 +301,7 @@ df <- data.frame(cbind(new_list, classification=names))
 
 # Annotate results
 
-```{r}
+```{r annotate}
 for (i in design_files){
   name.start <-  gsub(".csv","",i)
   res <- get(gsub("SAMPLE_FILE",i , "sig.SAMPLE_FILE"))
