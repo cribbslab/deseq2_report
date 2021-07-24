@@ -22,12 +22,73 @@ library(pheatmap)
 library(dplyr)
 library(RColorBrewer)
 library(pheatmap)
+library(yaml)
+library(rhdf5)
+library(tximport)
+library(ensembldb)
+library(EnsDb.Hsapiens.v86)
+library(EnsDb.Mmusculus.v79)
+```
+
+```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+params <- read_yaml("config.yml")
 ```
 
 
-```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
+```{r , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 design_files <- list.files(pattern = "full.csv")
+if(params$kallisto){
+  print("kallisto input detected")
+  
+  # load in the sample metadata file
+  sample_table <- read.csv("kallisto_input.csv")
+  
+  if (dir.exists(params$kallisto_dir)) {
+    path <- file.path(params$kallisto_dir, sample_table$SampleID, "abundance.h5")
+    sample_table <- dplyr::mutate(sample_table, path = path)
+  
+  if(params$species == "human"){
+    # Create the tx2gene file that will map transcripts to genes
+    Tx <- transcripts(EnsDb.Hsapiens.v86, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
+    
+  }else{
+    Tx <- transcripts(EnsDb.Mmusculus.v79, columns=c("tx_id", "gene_id", "symbol"))
+    Tx <- as_tibble(Tx)
+    Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
+    Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")  
+  }
+    
+    # import Kallisto transcript counts into R using Tximport
+    Txi_gene <- tximport(path, 
+                     type = "kallisto", 
+                     tx2gene = Tx, 
+                     txOut = FALSE, # TRUE outputs transcripts, FALSE outputs gene-level data
+                     countsFromAbundance = "lengthScaledTPM",
+                     ignoreTxVersion = TRUE)
+    # Write the counts to an object (used for metadata and clustering)
+    df_mRNA <- Txi_gene$counts %>% 
+            round() %>% 
+            data.frame()
+    colnames(df_mRNA) <- sample_table$SampleID
+    
+    meta_data <- sample_table
+    rownames(meta_data) <- meta_data$SampleID
+    assign(paste("meta_data", i, sep = "."), meta_data)
+    
+  } else {
+  print("Please add path to the kallisto dir in the config.yml file as it seems to be missing")
+}
+
+  
+  
+  
+}else{
+
+
 
 if (file.exists("featurecounts.tsv.gz")) {
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
@@ -49,18 +110,33 @@ if (file.exists(design_files[1])) {
     print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
 }
 
-
+}
 ```
 
 ```{r , include=FALSE}
 
-for (i in design_files) {
-  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
-  model <- as.character(meta_data$model[[1]])
-  dds <- run_deseq2_full(df_mRNA, meta_data, model)
-  assign(paste("dds_full", i, sep = "."), dds)
+if(params$kallisto){
+  for (i in design_files) {
+    meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+    design <- as.formula(meta_data$model[1])
+    # Create a DESeqDataSet object named dds
+    dds <- DESeqDataSetFromTximport(Txi_gene,
+                                    colData = meta_data,
+                                    design = design)
+    dds <- estimateSizeFactors(dds)
+    # Filtering: keep samples that have a count of higher than 1
+    dds <- dds[ rowSums(counts(dds)) > 1, ]
+    assign(paste("dds_full", i, sep = "."), dds)
+  }
+  }else{
 
-}
+  for (i in design_files) {
+    meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
+    model <- as.character(meta_data$model[[1]])
+    dds <- run_deseq2_full(df_mRNA, meta_data, model)
+    assign(paste("dds_full", i, sep = "."), dds)}
+  }
+
 ```
 
 # Heatmap of counts matrix {.tabset .tabset-fade}
@@ -71,12 +147,12 @@ To explore a count matrix, it is often instructive to look at it as a heatmap. B
 for (i in design_files) {
   
   dds <- get(gsub("SAMPLE_FILE",i , "dds_full.SAMPLE_FILE"))
-  meta_data <- read.table(i, sep=",", header = TRUE) 
+  meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
   select <- order(rowMeans(counts(dds, normalized=TRUE)), decreasing=TRUE)[1:200]
-  data = colData(dds)[,3]
+  data = colData(dds)[,1]
   df <- as.data.frame(data)
-  annotation <- data.frame(Var1 = meta_data[[3]], Var2 = meta_data[[2]])
+  annotation <- data.frame(Var1 = meta_data["compound"], Var2 = meta_data['Cells'])
   rownames(annotation) <- colnames(assay(vsd))
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")

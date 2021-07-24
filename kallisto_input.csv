@@ -1,0 +1,10 @@
+SampleID,compound,Cells,Donor,Day,model
+i25-BM-A2-Blank_S1,Blank,BM,1,1,~compound
+i26-BM-B2-Blank_S2,Blank,BM,1,1,
+i27-BM-C2-Blank_S3,Blank,BM,1,1,
+i28-BM-D1-Pamc3_S4,Pamc3,BM,1,1,
+i29-BM-D2-Pamc3_S5,Pamc3,BM,1,1,
+i30-BM-D3-Pamc3_S6,Pamc3,BM,1,1,
+i31-BM-A2plus-Pamc4-3SL_S7,Pamc4,BM,1,1,
+i32-BM-B2plus-Pamc4-3SL_S8,Pamc4,BM,1,1,
+i33-BM-C2plus-Pamc4-3SL_S9,Pamc4,BM,1,1,
