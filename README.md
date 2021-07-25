@@ -1,15 +1,22 @@
 # Deseq2 Bulk RNA-seq Report
 
-The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data. 
+The aim of this Rmarkdown website is to run Clustering, Deseq2 and Enrichment analysis using bulk RNA-seq data.
 
 Documentation for this code can be accessed [here](https://acribbs.github.io/deseq2_report/)
 
-Ths report requires a counts table (samples x genes) generated from running pseudoalignment (kallisto or salmon) or running mapping (hisat) followed by featurecounts.
+Ths report requires either:
+1. a counts table (samples x genes) generated from running running mapping (hisat) followed by featurecounts (using this [pipeline](https://github.com/cgat-developers/cgat-flow/blob/master/cgatpipelines/tools/pipeline_rnaseqdiffexpression.py)) or
+2. a directory containing  kallisto quant output (using this [pipeline](https://github.com/Acribbs/cribbslab/blob/master/cribbslab/pipeline_pseudobulk.py)).
 
 In order to run the report you require the following input files for the report to generate a report correctly:
 
 1. A meta data file following the naming convention design_<test>_<control>_<test>_<column>.csv
-2. A counts table called featurecounts.tsv.gz
+2. A counts table called featurecounts.tsv.gz or a kallisto quant directory containing the output from kallisto
+3. A config.yml for modifying the output of the deaseq_report
+if running kallisto:
+  4. A kallisto_input.csv file listing all the files
+else if running featurecounts:
+  4. A full.csv file listing all the input files
 
 Example files are currently within the repo so if you are unsure on how each of these files should be layed out please refer to the repo.
 
