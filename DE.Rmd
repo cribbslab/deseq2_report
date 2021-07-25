@@ -30,7 +30,7 @@ library(ensembldb)
 library(EnsDb.Hsapiens.v86)
 library(EnsDb.Mmusculus.v79)
 
-knitr::opts_chunk$set(cache=FALSE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
 ```
 
 ```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
@@ -309,7 +309,7 @@ for (i in design_files){
     
   }else{
   rownames(res) <- make.unique(res$Row.names)
-  res_tmp <- Annotate_genes_results(res)
+  res_tmp <- Annotate_genes_results(res, species=params$species)
   sig_name = paste("results/", name.start,"_annotate_sig.csv", sep="")
   write.csv(res_tmp, sig_name)
   assign(paste("sig", i, sep = "."), res)
@@ -324,7 +324,7 @@ for (i in design_files){
     
   }else{
   rownames(res) <- make.unique(res$Row.names)
-  res_tmp <- Annotate_genes_results(res)
+  res_tmp <- Annotate_genes_results(res, species=params$species)
   sig_name = paste("results/", name.start,"_annotate_res.csv", sep="")
   write.csv(res_tmp, sig_name)
   assign(paste("res", i, sep = "."), res)

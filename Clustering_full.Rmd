@@ -27,7 +27,7 @@ We define the term quality as fitness for purpose. Our purpose is the detection 
 In this page, you will see all of the analysis performed to understand which samples are potentially going to negatively impact the downstream analysis.
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(cache=FALSE)
+knitr::opts_chunk$set(cache=TRUE)
 source('functions.R')
 library(org.Hs.eg.db)
 library(DESeq2)
@@ -53,7 +53,7 @@ params <- read_yaml("config.yml")
 
 if(params$kallisto){
   print("kallisto input detected")
-  
+  design_files <- 'full.csv'
   # load in the sample metadata file
   sample_table <- read.csv("kallisto_input.csv")
   
@@ -90,20 +90,18 @@ if(params$kallisto){
     
     meta_data <- sample_table
     rownames(meta_data) <- meta_data$Sample
-    assign(paste("meta_data", design_files, sep = "."), meta_data)
+    assign(paste("meta_data", 'full.csv', sep = "."), meta_data)
     
   } else {
   print("Please add path to the kallisto dir in the config.yml file as it seems to be missing")
 }
-
-  
-  
   
 }else{
 
 
-design_files <- list.files(pattern = "full.csv")
+
 if (file.exists("featurecounts.tsv.gz")) {
+  design_files <- list.files(pattern = "full.csv")
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
   colnames(df_mRNA) <- gsub(".", "-", x = colnames(df_mRNA), fixed = T)
 } else {

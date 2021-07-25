@@ -6,6 +6,7 @@ output:
 ---
 
 ```{r, include=FALSE}
+source('functions.R')
 library(Pi)
 library(DT)
 knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE, error=FALSE, results='asis')
@@ -27,9 +28,9 @@ for (i in files) {
   ontology <- "MsigdbC2REACTOME"
   res <-  gsub("_sig.csv","",i)
   res <- paste0(res, "_res.csv")
-  background <- as.vector(read.csv(res)$SYMBOL)
+  background <- as.vector(toupper(read.csv(res)$SYMBOL))
 
-  data <- as.vector(read.csv(i)$SYMBOL)
+  data <- as.vector(toupper(read.csv(i)$SYMBOL))
 
   eTerm <- xEnricherGenes(data=data, background=background, ontology=ontology)
   
@@ -70,10 +71,11 @@ for (i in files) {
   ontology <- "MsigdbC2KEGG"
   res <-  gsub("_sig.csv","",i)
   res <- paste0(res, "_res.csv")
-  background <- as.vector(read.csv(res)$SYMBOL)
+  
+  background <- as.vector(toupper(read.csv(res)$SYMBOL))
 
-  data <- as.vector(read.csv(i)$SYMBOL)
-
+  data <- as.vector(toupper(read.csv(i)$SYMBOL))
+  
   eTerm <- xEnricherGenes(data=data, background=background, ontology=ontology)
   
   dir.create(file.path("enrichment_XGR", ontology), showWarnings = FALSE)

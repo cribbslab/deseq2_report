@@ -6,30 +6,33 @@ output:
 ---
 
 
-```{r}
+```{r library, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 library(pheatmap)
 library(tidyverse)
 source('functions.R')
+library(yaml)
 ```
 
+
+```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+params <- read_yaml("config.yml")
+```
 
 # Transcription factor analysis
 
 The aim of this code is to subset each transcription factor from your significant results and place the results of that into the folder TranscriptionFactors/
 
-```{r}
+```{r tr, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 TF <- read.csv("TF.csv", header = T)
-TF <- TF %>% filter(X == "Yes") %>% select(Name)
-```
+TF <- TF %>% dplyr::filter(X == "Yes") %>% dplyr::select(Name)
 
-```{r}
+
 design_files <- list.files(path="results", pattern = "(design_)*res\\.csv$")
 
 for (i in design_files) {
  df <- read.csv(paste0("results/",i), header=T)
- df_new <- subset(df, SYMBOL %in% toupper(TF$Name))
+ df_new <- subset(df, toupper(SYMBOL) %in% toupper(TF$Name))
  dir.create(file.path("TranscriptionFactors"), showWarnings = FALSE)
  write.csv(df_new, file=paste0("TranscriptionFactors/",i))
   }
-
 ```

@@ -4,6 +4,40 @@ output: html_document
 ---
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 
+
+```{r packages, , echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+# Package names
+packages <- c('pheatmap', 'dplyr', 'RColorBrewer', 'yaml', 'ggpubr', 'DT', 'msigdbr', 'kableExtra', 'stringr', 'dplyr', 'tidyverse')
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+bio_pkgs <- c("org.Hs.eg.db", "DESeq2", "rhdf5", "tximport", 
+          "ensembldb", "EnsDb.Hsapiens.v86", "EnsDb.Mmusculus.v79", "Pi", "fgsea", "EGSEA")
+
+# install:
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)){
+BiocManager::install(bio_pkgs)
+}
+
+# load all at once
+invisible(lapply(bio_pkgs, function(x) library(x, character.only=TRUE)))
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+
 # Running the report
 
 This Rmarkdown report describes the output of bulk RNA-seq experiments. 
