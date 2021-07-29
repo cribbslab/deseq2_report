@@ -18,6 +18,7 @@ knitr::opts_chunk$set(cache=TRUE, results='asis')
 source('functions.R')
 library(org.Hs.eg.db)
 library("org.Mmu.eg.db")
+library(biomaRt)
 library(DESeq2)
 library(pheatmap)
 library(dplyr)
@@ -40,16 +41,19 @@ params <- read_yaml("config.yml")
 
 ```{r input, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
 
+
 if(params$kallisto){
   print("kallisto input detected")
-  design_files <- 'full.csv'
+  
+  design_files <- list.files(path='designs_kallisto/', pattern = "design_")
+  
   # load in the sample metadata file
   sample_table <- read.csv("kallisto_input.csv")
   
   if (dir.exists(params$kallisto_dir)) {
     path <- file.path(params$kallisto_dir, sample_table$Sample, "abundance.h5")
     sample_table <- dplyr::mutate(sample_table, path = path)
-  
+
   if(params$species == "human"){
     # Create the tx2gene file that will map transcripts to genes
     Tx <- transcripts(EnsDb.Hsapiens.v86, columns=c("tx_id", "gene_id", "symbol"))
@@ -264,7 +268,7 @@ for (i in design_files) {
   print(Plot_pca_loadings(vsd = vsd,
                   nPCs = 6,
                   gene_prop = 1,
-                  title = "Plot_title"))
+                  title = "PCA_loadings"))
   cat('\n\n')
 }
 
