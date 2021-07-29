@@ -17,6 +17,7 @@ In this page, you will see all of the analysis performed to understand which sam
 knitr::opts_chunk$set(cache=TRUE, results='asis')
 source('functions.R')
 library(org.Hs.eg.db)
+library("org.Mmu.eg.db")
 library(DESeq2)
 library(pheatmap)
 library(dplyr)
@@ -41,9 +42,7 @@ params <- read_yaml("config.yml")
 
 if(params$kallisto){
   print("kallisto input detected")
-  
-  design_files <- list.files(path='designs_kallisto/', pattern = "design_")
-  
+  design_files <- 'full.csv'
   # load in the sample metadata file
   sample_table <- read.csv("kallisto_input.csv")
   
@@ -58,12 +57,22 @@ if(params$kallisto){
     Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
     Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
     
-  }else{
+  }else if(params$species == "mouse"){
     Tx <- transcripts(EnsDb.Mmusculus.v79, columns=c("tx_id", "gene_id", "symbol"))
     Tx <- as_tibble(Tx)
     Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
     Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")  
-  }
+  }else if(params$species == "macaque"){
+    orgSymbols <- keys(org.Mmu.eg.db, keytype="ENSEMBL")
+    mart <- useMart(dataset = "mmulatta_gene_ensembl", biomart='ensembl')
+    tx2gene <- getBM(attributes = c('ensembl_gene_id', 'ensembl_gene_id_version', 'ensembl_transcript_id', 'ensembl_transcript_id_version','entrezgene_id'),
+      filters = 'ensembl_gene_id',
+      values = orgSymbols, 
+      mart = mart)
+    Tx <- tx2gene %>%   dplyr::select(ensembl_transcript_id, ensembl_gene_id)
+    colnames(Tx) <- c("TXNAME", "GENEID")
+
+  }else{ print('please supply a valid species within the config.yml file')}
     
     # import Kallisto transcript counts into R using Tximport
     Txi_gene <- tximport(path, 

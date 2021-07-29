@@ -30,10 +30,16 @@ filter_genes <- function(result, name, species='human'){
   if(species == 'human'){
     annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
                                      columns="SYMBOL", keytype = "ENSEMBL")
-  }else{
+  }else if(species == 'mouse'){
     annots <-  AnnotationDbi::select(org.Mm.eg.db, keys=data,
                                      columns="SYMBOL", keytype = "ENSEMBL")
+  }else if(species == 'macaque'){
+    annots <-  AnnotationDbi::select(org.Mmu.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }else{
+    print('please supply a valid species within the config.yml file')
   }
+  
 
   result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
   res <- result %>% 
@@ -172,12 +178,18 @@ plot_volcano <- function(res, species="human"){
   data <- as.vector(rownames(test))
   
   if(species == 'human'){
-  annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
-                                   columns="SYMBOL", keytype = "ENSEMBL")
-  }else{
-  annots <-  AnnotationDbi::select(org.Mm.eg.db, keys=data,
+    annots <-  AnnotationDbi::select(org.Hs.eg.db, keys=data,
                                      columns="SYMBOL", keytype = "ENSEMBL")
+  }else if(species == 'mouse'){
+    annots <-  AnnotationDbi::select(org.Mm.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }else if(species == 'macaque'){
+    annots <-  AnnotationDbi::select(org.Mmu.eg.db, keys=data,
+                                     columns="SYMBOL", keytype = "ENSEMBL")
+  }else{
+    print('please supply a valid species within the config.yml file')
   }
+  
   result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
   res <- result %>% 
     dplyr::select(log2FoldChange, SYMBOL, baseMean, padj, Row.names) %>% 
@@ -632,7 +644,7 @@ Annotate_genes_results <- function(res, species='human'){
                          keytype="ENSEMBL",
                          multiVals="first")
   return(res)
-  }else{
+  }else if(species=='mouse'){
   res$GENENAME <- mapIds(org.Mm.eg.db,
                          keys=row.names(res),
                          column="GENENAME",
@@ -652,6 +664,28 @@ Annotate_genes_results <- function(res, species='human'){
                          multiVals="first")
   return(res)
   
+  }else if(species=='macaque'){
+    res$GENENAME <- mapIds(org.Mmu.eg.db,
+                           keys=row.names(res),
+                           column="GENENAME",
+                           keytype="ENSEMBL",
+                           multiVals="first")
+    res$SYMBOL <- mapIds(org.Mmu.eg.db,
+                         keys=row.names(res),
+                         column="SYMBOL",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+    
+    res$ENTREZID <- mapIds(org.Mmu.eg.db,
+                           #EnsDb.Hsapiens.v86,
+                           keys=row.names(res),
+                           column="ENTREZID",
+                           keytype="ENSEMBL",
+                           multiVals="first")
+    return(res)
+    
+  }else{
+    print('please supply a valid species within the config.yml file')
   }
   
   }

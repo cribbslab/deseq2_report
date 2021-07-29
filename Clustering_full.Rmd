@@ -30,6 +30,7 @@ In this page, you will see all of the analysis performed to understand which sam
 knitr::opts_chunk$set(cache=TRUE)
 source('functions.R')
 library(org.Hs.eg.db)
+library("org.Mmu.eg.db")
 library(DESeq2)
 library(pheatmap)
 library(dplyr)
@@ -37,6 +38,7 @@ library(RColorBrewer)
 library(pheatmap)
 library(yaml)
 library(rhdf5)
+library(biomaRt)
 library(tximport)
 library(ensembldb)
 library(EnsDb.Hsapiens.v86)
@@ -68,12 +70,22 @@ if(params$kallisto){
     Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
     Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")
     
-  }else{
+  }else if(params$species == "mouse"){
     Tx <- transcripts(EnsDb.Mmusculus.v79, columns=c("tx_id", "gene_id", "symbol"))
     Tx <- as_tibble(Tx)
     Tx <- dplyr::rename(Tx, target_id = tx_id, ens_gene = gene_id, ext_gene = symbol)
     Tx <- dplyr::select(Tx, "target_id", "ens_gene", "ext_gene")  
-  }
+  }else if(params$species == "macaque"){
+    orgSymbols <- keys(org.Mmu.eg.db, keytype="ENSEMBL")
+    mart <- useMart(dataset = "mmulatta_gene_ensembl", biomart='ensembl')
+    tx2gene <- getBM(attributes = c('ensembl_gene_id', 'ensembl_gene_id_version', 'ensembl_transcript_id', 'ensembl_transcript_id_version','entrezgene_id'),
+      filters = 'ensembl_gene_id',
+      values = orgSymbols, 
+      mart = mart)
+    Tx <- tx2gene %>%   dplyr::select(ensembl_transcript_id, ensembl_gene_id)
+    colnames(Tx) <- c("TXNAME", "GENEID")
+
+  }else{ print('please supply a valid species within the config.yml file')}
     
     # import Kallisto transcript counts into R using Tximport
     Txi_gene <- tximport(path, 
@@ -163,7 +175,7 @@ for (i in design_files) {
   select <- order(rowMeans(counts(dds, normalized=TRUE)), decreasing=TRUE)[1:200]
   data = colData(dds)[,1]
   df <- as.data.frame(data)
-  annotation <- data.frame(Var1 = meta_data["compound"], Var2 = meta_data['Cells'])
+  annotation <- data.frame(Var1 = meta_data[2], Var2 = meta_data[3])
   rownames(annotation) <- colnames(assay(vsd))
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")
@@ -189,8 +201,8 @@ for (i in design_files) {
   vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
   sampleDists <- dist(t(assay(vsd)))
   samplDistMatrix <- as.matrix(sampleDists)
-  rownames(samplDistMatrix) <- meta_data[['compound']]
-  colnames(samplDistMatrix) <- meta_data[['Cells']]
+  rownames(samplDistMatrix) <- meta_data[[2]]
+  colnames(samplDistMatrix) <- meta_data[[2]]
   colors <- colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
   assign(paste("vsd", i, sep = "."), vsd)
   
@@ -219,9 +231,10 @@ for (i in design_files) {
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")
-  print(plotPCA(vsd, intgroup=c(as.character('compound'),as.character('Cells'))))
+  print(plotPCA(vsd, intgroup=c(as.character(colnames(meta_data[2])),as.character(colnames(meta_data[3])))))
   cat('\n\n')
 }
+
 ```
 
 
