@@ -42,6 +42,7 @@ for (i in design_files){
 for (i in design_files){
   
 pathways <- "Hallmark"
+title = gsub(".csv","",i)
 res_name <- sub('.csv', '', i, perl = TRUE)
 res_name = paste("results/", res_name,"_annotate_res.csv", sep="")
   dir.create("results_gsea/", showWarnings = FALSE)
