@@ -11,7 +11,7 @@ library(fgsea)
 #library(multiGSEA)
 library(EGSEA)
 knitr::opts_chunk$set(echo = TRUE)
-design_files <- list.files(pattern = "design_")
+design_files <- list.files(path="designs_kallisto/", pattern = "design_")
 source('functions.R')
 library(kableExtra)
 library(stringr)
@@ -23,7 +23,8 @@ library(ggpubr)
 
 ```{r}
 for (i in design_files){
-  res_name = paste("results/", i,"_annotate_res.csv", sep="")
+  res_name <- sub('.csv', '', i, perl = TRUE)
+  res_name = paste("results/", res_name,"_annotate_res.csv", sep="")
   if(file.exists(res_name)){
     results_annotated = read.csv(res_name)
     dir.create("results_rnk/", showWarnings = FALSE)
@@ -41,9 +42,9 @@ for (i in design_files){
 for (i in design_files){
   
 pathways <- "Hallmark"
-title = gsub(".csv","",i)
-dir.create("results_gsea/", showWarnings = FALSE)
-res_name = paste("results/", title,"_annotate_res.csv", sep="")
+res_name <- sub('.csv', '', i, perl = TRUE)
+res_name = paste("results/", res_name,"_annotate_res.csv", sep="")
+  dir.create("results_gsea/", showWarnings = FALSE)
 
 if(file.exists(res_name)){
   print(i)
