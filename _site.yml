@@ -4,6 +4,9 @@ navbar:
   right:
   - text: Home
     href: index.html
+  - text: Clustering All
+    icon: fa-flask
+    href: Clustering_full.html
   - text: Clustering
     icon: fa-flask
     href: Clustering.html
