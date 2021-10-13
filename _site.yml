@@ -20,7 +20,7 @@ navbar:
     icon: fa-flask
     href: XGR_Enrichment.html
   - text: GSEA
-    href: GSEA.Rmd
+    href: GSEA.html
 output:
   html_document:
     css: style.css
