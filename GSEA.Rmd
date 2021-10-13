@@ -47,11 +47,22 @@ res_name <- sub('.csv', '', i, perl = TRUE)
 res_name = paste("results/", res_name,"_annotate_res.csv", sep="")
   dir.create("results_gsea/", showWarnings = FALSE)
 
-if(file.exists(res_name)){
+  
+  skip_to_next <- FALSE
+  
+  # Note that print(b) fails since b doesn't exist
+  
+    if(file.exists(res_name)){
   print(i)
-    results_dir = read.csv(res_name)
-    print(GSEA_plots(pathways, title, results_dir))
-    }
+  results_dir = read.csv(res_name)  
+  tryCatch(print(GSEA_plots(pathways, title, results_dir)), error = function(e) { skip_to_next <<- TRUE})}
+  
+  if(skip_to_next) { next }   
+  
+    
+  
+    
+    
 
 }
 
