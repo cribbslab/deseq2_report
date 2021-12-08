@@ -130,8 +130,8 @@ if (file.exists(paste0('designs_featurecounts/',design_files[1]))) {
   for (i in design_files){
   meta_data <- read.table(paste0('designs_featurecounts/',i), sep=",", header = TRUE) 
   rownames(meta_data) <- meta_data$Sample
-  df_mRNA = df_mRNA[,rownames(meta_data)]
-  all(rownames(meta_data) %in% colnames(df_mRNA))
+  df_mRNA_tmp = df_mRNA[,rownames(meta_data)]
+  all(rownames(meta_data) %in% colnames(df_mRNA_tmp))
   assign(paste("meta_data", i, sep = "."), meta_data)
   }
 } else {
