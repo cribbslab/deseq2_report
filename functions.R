@@ -134,13 +134,19 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
   
   res <- results(dds, contrast = c(value, test, control))
   
+  res_names <- resultsNames(deseq_results_corrected@dds)
+  
+  resLFC <- lfcShrink(deseq_results_corrected@dds, coef=res_names[2], type="apeglm")
+  
   return(new("DESeq2_return",
+             resLFC=resLFC,
              res=res,
              dds=dds))
 }
 
 setClass(Class="DESeq2_lrt_return",
          representation(
+           resLFC="DESeqResults",
            res="DESeqResults",
            dds="DESeqDataSet"
          )
