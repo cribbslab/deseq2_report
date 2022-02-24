@@ -110,6 +110,12 @@ run_deseq2_full <- function(df_mRNA, meta_data, model){
 
 
 
+setClass(Class="DESeq2_return",
+         representation(
+           res="DESeqResults",
+           dds="DESeqDataSet"
+         )
+)
 
 
 run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", value, model){
@@ -133,7 +139,6 @@ run_deseq2 <- function(df_mRNA, meta_data, control="untreated", test="treated", 
   resLFC <- lfcShrink(dds, coef=res_names[2], type="apeglm")
   
   return(new("DESeq2_return",
-             resLFC=resLFC,
              res=res,
              dds=dds))
 }
