@@ -30,6 +30,7 @@ library(tximport)
 library(ensembldb)
 library(EnsDb.Hsapiens.v86)
 library(EnsDb.Mmusculus.v79)
+library(biomaRt)
 
 knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
 ```
