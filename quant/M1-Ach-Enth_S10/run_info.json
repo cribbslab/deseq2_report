@@ -1,0 +1,13 @@
+{
+	"n_targets": 49537,
+	"n_bootstraps": 100,
+	"n_processed": 23867755,
+	"n_pseudoaligned": 16718762,
+	"n_unique": 7378556,
+	"p_pseudoaligned": 70.0,
+	"p_unique": 30.9,
+	"kallisto_version": "0.46.2",
+	"index_version": 10,
+	"start_time": "Wed Jul 28 20:45:18 2021",
+	"call": "kallisto quant --rf-stranded -t 8 -b 100 -i kalindex/Macaca_mulatta.Mmul_10.cdna.all.idx -o quant/M1-Ach-Enth_S10 M1-Ach-Enth_S10.fastq.1.gz M1-Ach-Enth_S10.fastq.2.gz"
+}
