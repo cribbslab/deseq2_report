@@ -36,9 +36,22 @@ filter_genes <- function(result, name, species='human'){
   }else if(species == 'macaque'){
     annots <-  AnnotationDbi::select(org.Mmu.eg.db, keys=data,
                                      columns="SYMBOL", keytype = "ENSEMBL")
+  }else if(species == 'rabbit'){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="ocuniculus_gene_ensembl", 
+                      host="uswest.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
+    colnames(annots) <- c('ENSEMBL','SYMBOL')
+  }else if(species == 'pig'){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="sscrofa_gene_ensembl", 
+                      host="uswest.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
+    colnames(annots) <- c('ENSEMBL','SYMBOL')
   }else{
     print('please supply a valid species within the config.yml file')
   }
+  
   
 
   result <- merge(test, annots, by.x="row.names", by.y="ENSEMBL")
@@ -191,6 +204,18 @@ plot_volcano <- function(res, species="human"){
   }else if(species == 'macaque'){
     annots <-  AnnotationDbi::select(org.Mmu.eg.db, keys=data,
                                      columns="SYMBOL", keytype = "ENSEMBL")
+  }else if(species == 'rabbit'){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="ocuniculus_gene_ensembl", 
+                      host="uswest.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
+    colnames(annots) <- c('ENSEMBL','SYMBOL')
+  }else if(species == 'pig'){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="sscrofa_gene_ensembl", 
+                      host="uswest.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
+    colnames(annots) <- c('ENSEMBL','SYMBOL')
   }else{
     print('please supply a valid species within the config.yml file')
   }
@@ -670,6 +695,42 @@ Annotate_genes_results <- function(res, species='human'){
   return(res)
   
   }else if(species=='macaque'){
+    res$GENENAME <- mapIds(org.Mmu.eg.db,
+                           keys=row.names(res),
+                           column="GENENAME",
+                           keytype="ENSEMBL",
+                           multiVals="first")
+    res$SYMBOL <- mapIds(org.Mmu.eg.db,
+                         keys=row.names(res),
+                         column="SYMBOL",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+    
+    res$ENTREZID <- mapIds(org.Mmu.eg.db,
+                           #EnsDb.Hsapiens.v86,
+                           keys=row.names(res),
+                           column="ENTREZID",
+                           keytype="ENSEMBL",
+                           multiVals="first")
+    return(res)
+    
+  }else if(species=='pig'){
+
+    res$SYMBOL <- mapIds(org.Ss.eg.db,
+                         keys=row.names(res),
+                         column="SYMBOL",
+                         keytype="ENSEMBL",
+                         multiVals="first")
+    
+    res$ENTREZID <- mapIds(org.Mmu.eg.db,
+                           #EnsDb.Hsapiens.v86,
+                           keys=row.names(res),
+                           column="ENTREZID",
+                           keytype="ENSEMBL",
+                           multiVals="first")
+    return(res)
+    
+  }else if(species=='rabbit'){
     res$GENENAME <- mapIds(org.Mmu.eg.db,
                            keys=row.names(res),
                            column="GENENAME",
