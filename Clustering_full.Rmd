@@ -31,6 +31,7 @@ knitr::opts_chunk$set(cache=TRUE)
 source('functions.R')
 library(org.Hs.eg.db)
 library("org.Mmu.eg.db")
+library(org.Ss.eg.db)
 library(DESeq2)
 library(pheatmap)
 library(dplyr)
@@ -84,8 +85,33 @@ if(params$kallisto){
       mart = mart)
     Tx <- tx2gene %>%   dplyr::select(ensembl_transcript_id, ensembl_gene_id)
     colnames(Tx) <- c("TXNAME", "GENEID")
-
-  }else{ print('please supply a valid species within the config.yml file')}
+  }else if(params$species == "pig"){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                  dataset="sscrofa_gene_ensembl", 
+                  host="uswest.ensembl.org",
+                  ensemblRedirect = FALSE)
+    orgSymbols <- unlist(getBM(attributes = 'ensembl_gene_id', mart=ensembl))
+    mart <- useMart(dataset = "sscrofa_gene_ensembl", biomart='ensembl', host="uswest.ensembl.org")
+    tx2gene <- getBM(attributes = c('ensembl_gene_id', 'ensembl_gene_id_version', 'ensembl_transcript_id', 'ensembl_transcript_id_version','entrezgene_id'),
+      filters = 'ensembl_gene_id',
+      values = orgSymbols, 
+      mart = mart)
+    Tx <- tx2gene %>%   dplyr::select(ensembl_transcript_id, ensembl_gene_id)
+    colnames(Tx) <- c("TXNAME", "GENEID")
+  }else if(params$species == "rabbit"){
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                  dataset="ocuniculus_gene_ensembl", 
+                  host="uswest.ensembl.org",
+                  ensemblRedirect = FALSE)
+    orgSymbols <- unlist(getBM(attributes = 'ensembl_gene_id', mart=ensembl))
+    mart <- useMart(dataset = "ocuniculus_gene_ensembl", biomart='ensembl', host="uswest.ensembl.org")
+    tx2gene <- getBM(attributes = c('ensembl_gene_id', 'ensembl_gene_id_version', 'ensembl_transcript_id', 'ensembl_transcript_id_version','entrezgene_id'),
+      filters = 'ensembl_gene_id',
+      values = orgSymbols, 
+      mart = mart)
+    Tx <- tx2gene %>%   dplyr::select(ensembl_transcript_id, ensembl_gene_id)
+    colnames(Tx) <- c("TXNAME", "GENEID")
+    }else{ print('please supply a valid species within the config.yml file')}
     
     # import Kallisto transcript counts into R using Tximport
     Txi_gene <- tximport(path, 
@@ -109,9 +135,6 @@ if(params$kallisto){
 }
   
 }else{
-
-
-
 if (file.exists("featurecounts.tsv.gz")) {
   design_files <- list.files(pattern = "full.csv")
   df_mRNA <- read.table(gzfile("featurecounts.tsv.gz"), sep = "\t", header = TRUE, row.names = 1)
@@ -119,8 +142,6 @@ if (file.exists("featurecounts.tsv.gz")) {
 } else {
   print("Please add featurecounts.tsv.gz into the project folder as it seems to be missing")
 }
-
-
 if (file.exists(design_files[1])) {
   for (i in design_files){
   meta_data <- read.table(i, sep=",", header = TRUE) 
@@ -132,8 +153,10 @@ if (file.exists(design_files[1])) {
 } else {
     print("No design files were detected please add a file called design_<test>_<control>_<test>_<column>.csv. Please refer to documentation on github for more ifnormation")
 }
-
 }
+
+
+
 ```
 
 ```{r dds, include=FALSE}
@@ -231,7 +254,7 @@ for (i in design_files) {
   meta_data <- get(gsub("SAMPLE_FILE",i , "meta_data.SAMPLE_FILE"))
   name <-  gsub(".csv","",i)
   cat("### ",name,"\n")
-  print(plotPCA(vsd, intgroup=c(as.character(colnames(meta_data[2])),as.character(colnames(meta_data[3])))))
+  print(plotPCA(vsd, intgroup=c(as.character(colnames(meta_data[2])))))
   cat('\n\n')
 }
 

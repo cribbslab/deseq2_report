@@ -1,5 +1,5 @@
-Sample,Condition,Run,model
-Sample_RPFN2_S31_Run1,Control,one,~Condition
+Sample,condition,Run,model
+Sample_RPFN2_S31_Run1,Control,one,~condition
 Sample_RPFN2_S31_Run2,Control,two,
 Sample_RPFN4_S32_Run1,Control,one,
 Sample_RPFN4_S32_Run2,Control,two,

@@ -1,7 +1,7 @@
 # Are you providing the output of a combined featurecounts or kallisto output?
 # If providing kallisto then set to True and provide path to the kallisto quant dir
-kallisto: True
+kallisto: False
 kallisto_dir: "/Users/adamcribbs/Documents/PROJECTS/Macaque/quant/"
 
 # Specify if macaque, mouse or human
-species: "macaque"
+species: "rabbit"
