@@ -11,13 +11,22 @@ library(fgsea)
 #library(multiGSEA)
 library(EGSEA)
 knitr::opts_chunk$set(echo = TRUE)
-design_files <- list.files(path="designs_kallisto/", pattern = "design_")
+
 source('functions.R')
 library(kableExtra)
 library(stringr)
 library(dplyr)
 library(ggpubr)
 knitr::opts_chunk$set(cache=TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r yaml, echo=TRUE,warning=FALSE,message=FALSE,error=FALSE, include=FALSE}
+params <- read_yaml("config.yml")
+
+if(params$kallisto){
+design_files <- list.files(path="designs_kallisto/", pattern = "design_")}else{
+  design_files <- list.files(path='designs_featurecounts/', pattern = "design_")
+}
 ```
 
 # GSEA rank list
@@ -53,7 +62,7 @@ res_name = paste("results/", res_name,"_annotate_res.csv", sep="")
   
   # Note that print(b) fails since b doesn't exist
   
-    if(file.exists(res_name)){
+  if(file.exists(res_name)){
   print(i)
   results_dir = read.csv(res_name)  
   tryCatch(print(GSEA_plots(pathways, title, results_dir)), error = function(e) { skip_to_next <<- TRUE})}

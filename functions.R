@@ -45,7 +45,7 @@ filter_genes <- function(result, name, species='human'){
   }else if(species == 'pig'){
     ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
                       dataset="sscrofa_gene_ensembl", 
-                      host="uswest.ensembl.org")
+                      host="useast.ensembl.org")
     annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
     colnames(annots) <- c('ENSEMBL','SYMBOL')
   }else{
@@ -213,7 +213,7 @@ plot_volcano <- function(res, species="human"){
   }else if(species == 'pig'){
     ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
                       dataset="sscrofa_gene_ensembl", 
-                      host="uswest.ensembl.org")
+                      host="useast.ensembl.org")
     annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol'), mart=ensembl))
     colnames(annots) <- c('ENSEMBL','SYMBOL')
   }else{
@@ -716,38 +716,30 @@ Annotate_genes_results <- function(res, species='human'){
     
   }else if(species=='pig'){
 
-    res$SYMBOL <- mapIds(org.Ss.eg.db,
-                         keys=row.names(res),
-                         column="SYMBOL",
-                         keytype="ENSEMBL",
-                         multiVals="first")
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="sscrofa_gene_ensembl", 
+                      host="useast.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'entrezgene_id'), mart=ensembl))
     
-    res$ENTREZID <- mapIds(org.Mmu.eg.db,
-                           #EnsDb.Hsapiens.v86,
-                           keys=row.names(res),
-                           column="ENTREZID",
-                           keytype="ENSEMBL",
-                           multiVals="first")
+    colnames(annots) <- c('ENSEMBL', 'ENTREZID')
+    
+    res <- merge(as.data.frame(res), annots, by.x='Row.names', by.y='ENSEMBL')
+    rownames(res) <- make.unique(res$Row.names)
     return(res)
     
   }else if(species=='rabbit'){
-    res$GENENAME <- mapIds(org.Mmu.eg.db,
-                           keys=row.names(res),
-                           column="GENENAME",
-                           keytype="ENSEMBL",
-                           multiVals="first")
-    res$SYMBOL <- mapIds(org.Mmu.eg.db,
-                         keys=row.names(res),
-                         column="SYMBOL",
-                         keytype="ENSEMBL",
-                         multiVals="first")
     
-    res$ENTREZID <- mapIds(org.Mmu.eg.db,
-                           #EnsDb.Hsapiens.v86,
-                           keys=row.names(res),
-                           column="ENTREZID",
-                           keytype="ENSEMBL",
-                           multiVals="first")
+    ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                      dataset="ocuniculus_gene_ensembl", 
+                      host="useast.ensembl.org")
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol', 'entrezgene_id'), mart=ensembl))
+    
+    colnames(annots) <- c('ENSEMBL','SYMBOL', 'ENTREZID')
+    
+    res <- merge(as.data.frame(res), annots, by.x=0, by.y='ENSEMBL')
+    rownames(res) <- make.unique(res$Row.names)
+    
+    
     return(res)
     
   }else{
