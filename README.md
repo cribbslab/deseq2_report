@@ -28,6 +28,8 @@ Example files are currently within the repo so if you are unsure on how each of 
 
 * Navigate to the directory and rename the deseq2.Rproj file to something of your choosing
 
+* modify the config.yml file
+
 * Remove the design_* files and make your own based on the following naming convention:
 
   `design_<test>_<control>_<test>_<column>.csv`
@@ -57,6 +59,8 @@ In order to run the report you require the following input files for the report 
 Example files are currently within the repo so if you are unsure on how each of these files should be layed out please refer to the repo.
 
 * Navigate to the directory and rename the deseq2.Rproj file to something of your choosing
+
+* modify the config.yml file
 
 * Remove the design_* files and make your own based on the following naming convention:
 
