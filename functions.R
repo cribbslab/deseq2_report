@@ -732,11 +732,11 @@ Annotate_genes_results <- function(res, species='human'){
     ensembl = useMart(biomart="ENSEMBL_MART_ENSEMBL",
                       dataset="ocuniculus_gene_ensembl", 
                       host="useast.ensembl.org")
-    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'hgnc_symbol', 'entrezgene_id'), mart=ensembl))
+    annots <- as.data.frame(getBM(attributes = c('ensembl_gene_id', 'entrezgene_id'), mart=ensembl))
     
-    colnames(annots) <- c('ENSEMBL','SYMBOL', 'ENTREZID')
+    colnames(annots) <- c('ENSEMBL', 'ENTREZID')
     
-    res <- merge(as.data.frame(res), annots, by.x=0, by.y='ENSEMBL')
+    res <- merge(as.data.frame(res), annots, by.x='Row.names', by.y='ENSEMBL')
     rownames(res) <- make.unique(res$Row.names)
     
     

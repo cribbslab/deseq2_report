@@ -4,4 +4,4 @@ kallisto: False
 kallisto_dir: "/Users/adamcribbs/Documents/PROJECTS/Macaque/quant/"
 
 # Specify if macaque, mouse or human
-species: "pig"
+species: "rabbit"
